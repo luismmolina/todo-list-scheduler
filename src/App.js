@@ -1,71 +1,73 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { ThemeProvider } from "styled-components";
 import {
-  MantineProvider,
-  ColorSchemeProvider,
-  AppShell,
-  Navbar,
-  Header,
-  Text,
-  Button,
-  Switch,
-  Group,
-  Stack,
-  Modal,
-  TextInput,
-  NumberInput,
-  Select,
-  ActionIcon,
-} from "@mantine/core";
-import { DatePicker, TimeInput } from "@mantine/dates";
-import { useColorScheme } from "@mantine/hooks";
-import {
-  format,
-  addDays,
-  setHours,
-  setMinutes,
-  isAfter,
-  isBefore,
-} from "date-fns";
-import {
-  IconSun,
-  IconMoonStars,
-  IconPlus,
-  IconClock,
-  IconCalendar,
-  IconList,
-  IconAdjustments,
-} from "@tabler/icons-react";
-import { triageTasks, adjustSchedule } from "./schedulingUtils";
+  triageTasks,
+  adjustSchedule,
+  moveTaskToNextDay,
+} from "./components/schedulingUtils";
+import { theme } from "./styles/theme";
+import GlobalStyle from "./styles/globalStyles";
+import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
+import Content from "./components/Content";
+import { Modal, ModalContent } from "./components/Modal";
+import AddTaskForm from "./components/AddTaskForm";
+import MoveTaskModal from "./components/MoveTaskModal";
+
+import styled from "styled-components";
+
+const AppContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  @media (max-width: 768px) {
+    height: auto;
+  }
+`;
+
+const Main = styled.main`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  @media (min-width: 769px) {
+    flex-direction: row;
+  }
+`;
 
 const LOCAL_STORAGE_KEY = "todoListSchedulerTasks";
 
 const App = () => {
-  const preferredColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState(preferredColorScheme);
-  const toggleColorScheme = () =>
-    setColorScheme(colorScheme === "dark" ? "light" : "dark");
-
   const [tasks, setTasks] = useState(() => {
-    const savedTasks = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return savedTasks
-      ? JSON.parse(savedTasks)
-      : { scheduled: [], deferred: [] };
+    const savedTasksString = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedTasksString) {
+      try {
+        const savedTasks = JSON.parse(savedTasksString);
+        const parsedTasks = savedTasks.map((task) => ({
+          ...task,
+          startTime: task.startTime ? new Date(task.startTime) : null,
+          endTime: task.endTime ? new Date(task.endTime) : null,
+        }));
+        return { scheduled: parsedTasks, deferred: [] };
+      } catch (error) {
+        console.error("Error parsing initial saved tasks:", error);
+        return { scheduled: [], deferred: [] };
+      }
+    }
+    return { scheduled: [], deferred: [] };
   });
 
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(() => {
+    const now = new Date();
+
+    return now;
+  });
   const [viewMode, setViewMode] = useState("list");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [remainingTime, setRemainingTime] = useState(0);
   const [isAddingTask, setIsAddingTask] = useState(false);
-  const [newTask, setNewTask] = useState({
-    title: "",
-    duration: 30,
-    priority: "should do",
-    place: "home",
-  });
-  const [wakeUpTime, setWakeUpTime] = useState(
-    setHours(setMinutes(new Date(), 0), 8)
-  ); // Default wake-up time: 8:00 AM
+  const [isMovingTask, setIsMovingTask] = useState(false);
+  const [taskToMove, setTaskToMove] = useState(null);
 
   const updateTaskStatuses = useCallback((time, currentTasks) => {
     const { scheduledTasks, deferredTasks, remainingTime } = triageTasks(
@@ -77,44 +79,36 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    updateTaskStatuses(currentTime, [...tasks.scheduled, ...tasks.deferred]);
+    updateTaskStatuses(currentTime, tasks.scheduled);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasks));
+    const tasksToSave = [...tasks.scheduled, ...tasks.deferred];
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasksToSave));
   }, [tasks]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // Update every minute
+      setCurrentTime((prevTime) => {
+        const newTime = new Date(prevTime.getTime() + 60000);
+
+        updateTaskStatuses(newTime, [...tasks.scheduled, ...tasks.deferred]);
+        return newTime;
+      });
+    }, 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [updateTaskStatuses, tasks]);
 
   const addTask = useCallback(
     (task) => {
-      const now = new Date();
-      const taskStartTime = isAfter(now, wakeUpTime) ? now : wakeUpTime;
-      const newTask = {
-        ...task,
-        id: Date.now(),
-        startTime: taskStartTime,
-        status: "pending",
-      };
       updateTaskStatuses(currentTime, [
         ...tasks.scheduled,
         ...tasks.deferred,
-        newTask,
+        task,
       ]);
       setIsAddingTask(false);
-      setNewTask({
-        title: "",
-        duration: 30,
-        priority: "should do",
-        place: "home",
-      });
     },
-    [currentTime, tasks, wakeUpTime, updateTaskStatuses]
+    [currentTime, tasks, updateTaskStatuses]
   );
 
   const deleteTask = useCallback(
@@ -162,174 +156,89 @@ const App = () => {
     [currentTime, tasks]
   );
 
-  const renderTaskList = () => (
-    <Stack spacing="md">
-      {tasks.scheduled.map((task) => (
-        <Group
-          key={task.id}
-          position="apart"
-          style={{
-            backgroundColor: colorScheme === "dark" ? "#25262b" : "#f8f9fa",
-            padding: "10px",
-            borderRadius: "5px",
-          }}
-        >
-          <Stack spacing={0}>
-            <Text weight={500}>{task.title}</Text>
-            <Text size="sm" color="dimmed">
-              {task.duration} min - {task.priority} - {task.place}
-            </Text>
-            <Text size="sm" color="dimmed">
-              {format(task.startTime, "h:mm a")}
-            </Text>
-          </Stack>
-          <Group>
-            <ActionIcon
-              color="blue"
-              onClick={() => editTask(task.id, { ...task })}
-            >
-              <IconAdjustments size={16} />
-            </ActionIcon>
-            <ActionIcon color="green" onClick={() => completeTask(task.id)}>
-              <IconClock size={16} />
-            </ActionIcon>
-            <ActionIcon color="red" onClick={() => deleteTask(task.id)}>
-              <IconPlus size={16} style={{ transform: "rotate(45deg)" }} />
-            </ActionIcon>
-          </Group>
-        </Group>
-      ))}
-    </Stack>
+  const handleMoveToNextDay = useCallback(
+    (taskId) => {
+      const { scheduledTasks, deferredTasks, remainingTime } =
+        moveTaskToNextDay(
+          taskId,
+          [...tasks.scheduled, ...tasks.deferred],
+          currentTime
+        );
+      setTasks({ scheduled: scheduledTasks, deferred: deferredTasks });
+      setRemainingTime(remainingTime);
+    },
+    [currentTime, tasks]
   );
 
-  return (
-    <ColorSchemeProvider
-      colorScheme={colorScheme}
-      toggleColorScheme={toggleColorScheme}
-    >
-      <MantineProvider
-        theme={{ colorScheme }}
-        withGlobalStyles
-        withNormalizeCSS
-      >
-        <AppShell
-          padding="md"
-          navbar={
-            <Navbar width={{ base: 300 }} p="xs">
-              <Navbar.Section>
-                <Group position="apart">
-                  <Text size="xl" weight={700}>
-                    Task Scheduler
-                  </Text>
-                  <Switch
-                    checked={colorScheme === "dark"}
-                    onChange={toggleColorScheme}
-                    size="lg"
-                    onLabel={<IconMoonStars size={16} stroke={2.5} />}
-                    offLabel={<IconSun size={16} stroke={2.5} />}
-                  />
-                </Group>
-              </Navbar.Section>
-              <Navbar.Section grow mt="md">
-                <Button
-                  fullWidth
-                  leftIcon={<IconPlus size={16} />}
-                  onClick={() => setIsAddingTask(true)}
-                >
-                  Add Task
-                </Button>
-                <Group grow mt="sm">
-                  <Button
-                    variant={viewMode === "list" ? "filled" : "light"}
-                    onClick={() => setViewMode("list")}
-                    leftIcon={<IconList size={16} />}
-                  >
-                    List
-                  </Button>
-                  <Button
-                    variant={viewMode === "calendar" ? "filled" : "light"}
-                    onClick={() => setViewMode("calendar")}
-                    leftIcon={<IconCalendar size={16} />}
-                  >
-                    Calendar
-                  </Button>
-                </Group>
-              </Navbar.Section>
-              <Navbar.Section>
-                <Text size="sm" weight={500} mb={5}>
-                  Wake-up Time
-                </Text>
-                <TimeInput
-                  value={wakeUpTime}
-                  onChange={(newTime) => setWakeUpTime(newTime)}
-                  icon={<IconClock size={16} />}
-                />
-              </Navbar.Section>
-            </Navbar>
-          }
-          header={
-            <Header height={60} p="xs">
-              <Group position="apart">
-                <Text>Current Time: {format(currentTime, "h:mm a")}</Text>
-                <Text>Remaining Time: {Math.round(remainingTime)} minutes</Text>
-              </Group>
-            </Header>
-          }
-        >
-          {viewMode === "list" ? (
-            renderTaskList()
-          ) : (
-            <Text>Calendar View (To be implemented)</Text>
-          )}
+  const openMoveTaskModal = (task) => {
+    setTaskToMove(task);
+    setIsMovingTask(true);
+  };
 
-          <Modal
-            opened={isAddingTask}
-            onClose={() => setIsAddingTask(false)}
-            title="Add New Task"
-          >
-            <Stack>
-              <TextInput
-                label="Task Title"
-                value={newTask.title}
-                onChange={(e) =>
-                  setNewTask({ ...newTask, title: e.target.value })
-                }
+  const handleMoveTask = (taskId, newDate) => {
+    const updatedTasks = [...tasks.scheduled, ...tasks.deferred].map((task) =>
+      task.id === taskId
+        ? { ...task, startTime: newDate, status: "pending" }
+        : task
+    );
+    updateTaskStatuses(currentTime, updatedTasks);
+    setIsMovingTask(false);
+    setTaskToMove(null);
+  };
+
+  return (
+    <ThemeProvider theme={theme}>
+      <GlobalStyle />
+      <AppContainer>
+        <Header
+          currentTime={currentTime}
+          remainingTime={remainingTime}
+          setViewMode={setViewMode}
+          setIsAddingTask={setIsAddingTask}
+        />
+        <Main>
+          <Sidebar
+            tasks={tasks.deferred}
+            handleMoveToNextDay={handleMoveToNextDay}
+            handleAdjustSchedule={handleAdjustSchedule}
+          />
+          <Content
+            viewMode={viewMode}
+            tasks={tasks.scheduled}
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            deleteTask={deleteTask}
+            completeTask={completeTask}
+            editTask={editTask}
+            currentTime={currentTime}
+            openMoveTaskModal={openMoveTaskModal}
+          />
+        </Main>
+        {isAddingTask && (
+          <Modal>
+            <ModalContent>
+              <AddTaskForm
+                addTask={addTask}
+                onCancel={() => setIsAddingTask(false)}
               />
-              <NumberInput
-                label="Duration (minutes)"
-                value={newTask.duration}
-                onChange={(value) =>
-                  setNewTask({ ...newTask, duration: value })
-                }
-                min={1}
-              />
-              <Select
-                label="Priority"
-                value={newTask.priority}
-                onChange={(value) =>
-                  setNewTask({ ...newTask, priority: value })
-                }
-                data={[
-                  { value: "must do", label: "Must Do" },
-                  { value: "should do", label: "Should Do" },
-                  { value: "if time available", label: "If Time Available" },
-                ]}
-              />
-              <Select
-                label="Place"
-                value={newTask.place}
-                onChange={(value) => setNewTask({ ...newTask, place: value })}
-                data={[
-                  { value: "home", label: "Home" },
-                  { value: "work", label: "Work" },
-                ]}
-              />
-              <Button onClick={() => addTask(newTask)}>Add Task</Button>
-            </Stack>
+            </ModalContent>
           </Modal>
-        </AppShell>
-      </MantineProvider>
-    </ColorSchemeProvider>
+        )}
+        {isMovingTask && taskToMove && (
+          <Modal>
+            <ModalContent>
+              <MoveTaskModal
+                task={taskToMove}
+                onMove={handleMoveTask}
+                onCancel={() => setIsMovingTask(false)}
+                currentTasks={[...tasks.scheduled, ...tasks.deferred]}
+                currentTime={currentTime}
+              />
+            </ModalContent>
+          </Modal>
+        )}
+      </AppContainer>
+    </ThemeProvider>
   );
 };
 

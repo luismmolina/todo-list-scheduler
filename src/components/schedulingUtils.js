@@ -1,16 +1,25 @@
+// schedulingUtils.js
 const timeSlots = [
-  { start: 9, end: 17, place: "work" },
-  { start: 17, end: 22, place: "home" },
-  { start: 22, end: 9, place: "sleep" },
+  { start: 8, end: 15, place: "home" },
+  { start: 15, end: 20, place: "work" },
+  { start: 20, end: 23, place: "home" },
+  { start: 23, end: 8, place: "sleep" },
 ];
 
 const priorityOrder = ["must do", "should do", "if time available"];
 const BUFFER_TIME = 10; // 10 minutes buffer between tasks
 
+const isConflicting = (taskStartTime, taskDuration, existingTask) => {
+  const taskEndTime = new Date(taskStartTime.getTime() + taskDuration * 60000);
+  return (
+    taskStartTime < existingTask.endTime && taskEndTime > existingTask.startTime
+  );
+};
+
 const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
   let currentTime = new Date(startTime);
   const endOfDay = new Date(currentTime);
-  endOfDay.setHours(22, 0, 0, 0);
+  endOfDay.setHours(24, 0, 0, 0);
 
   while (currentTime < endOfDay) {
     const currentHour = currentTime.getHours();
@@ -32,9 +41,7 @@ const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
       const conflictingTask = existingTasks.find(
         (task) =>
           task.status !== "completed" &&
-          currentTime < task.endTime &&
-          new Date(currentTime.getTime() + (duration + BUFFER_TIME) * 60000) >
-            task.startTime
+          isConflicting(currentTime, duration + BUFFER_TIME, task)
       );
 
       if (
@@ -49,16 +56,13 @@ const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
           conflictingTask.endTime.getTime() + BUFFER_TIME * 60000
         );
       } else {
-        // Move to the next hour
-        currentTime.setHours(currentTime.getHours() + 1, 0, 0, 0);
+        currentTime.setMinutes(currentTime.getMinutes() + 1);
       }
     } else {
-      // Move to the next hour
       currentTime.setHours(currentTime.getHours() + 1, 0, 0, 0);
     }
   }
 
-  // If no suitable slot found within the day, return null
   return null;
 };
 
@@ -71,7 +75,6 @@ export const scheduleTask = (task, currentTime, existingTasks) => {
   );
 
   if (!startTime) {
-    // If no suitable slot found, the task will be deferred
     return {
       ...task,
       status: "deferred",
@@ -82,7 +85,6 @@ export const scheduleTask = (task, currentTime, existingTasks) => {
 
   const endTime = new Date(startTime.getTime() + task.duration * 60000);
 
-  // Determine initial status
   let status = "pending";
   if (startTime <= currentTime && endTime > currentTime) {
     status = "ongoing";
@@ -105,9 +107,8 @@ export const triageTasks = (tasks, currentTime) => {
     bedTime.setDate(bedTime.getDate() + 1);
   }
 
-  let availableTime = (bedTime - currentTime) / 60000; // in minutes
+  let availableTime = (bedTime - currentTime) / 60000;
 
-  // Sort tasks by priority and then by scheduled start time
   const sortedTasks = [...tasks].sort((a, b) => {
     if (a.status === "completed" && b.status !== "completed") return 1;
     if (b.status === "completed" && a.status !== "completed") return -1;
@@ -134,7 +135,6 @@ export const triageTasks = (tasks, currentTime) => {
     }
   }
 
-  // Ensure availableTime is not negative
   availableTime = Math.max(0, availableTime);
 
   return { scheduledTasks, deferredTasks, remainingTime: availableTime };
