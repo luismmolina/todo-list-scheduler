@@ -117,19 +117,30 @@ const App = () => {
 
   const addTask = useCallback(
     async (taskInput) => {
+      console.log("Adding task, input:", taskInput);
       if (scheduler) {
+        console.log("Scheduler exists, parsing task input");
         const parsedTask = await parseTaskInput(taskInput);
+        console.log("Parsed task result:", parsedTask);
         if (parsedTask) {
           const newTask = {
             id: Date.now(),
             ...parsedTask,
             status: "pending",
           };
+          console.log("New task created:", newTask);
           const updatedSchedule = scheduler.addTask(newTask);
+          console.log("Updated schedule:", updatedSchedule);
           setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+          console.log("Scheduler updated");
+        } else {
+          console.error("Failed to parse task");
         }
+      } else {
+        console.error("Scheduler is not initialized");
       }
       setIsAddingTask(false);
+      console.log("Add task process completed");
     },
     [scheduler, currentTime]
   );
