@@ -2,9 +2,8 @@ import { differenceInMinutes, addMinutes } from "date-fns";
 
 const BUFFER_TIME = 10; // 10 minutes buffer between tasks
 const TIME_BLOCKS = [
-  { start: 8, end: 12, place: "home" },
-  { start: 12, end: 13, place: "break" },
-  { start: 13, end: 17, place: "work" },
+  { start: 8, end: 14.5, place: "home" },
+  { start: 15, end: 17, place: "work" },
   { start: 17, end: 22, place: "home" },
   { start: 22, end: 8, place: "sleep" },
 ];
