@@ -1,7 +1,10 @@
 const API_URL = "https://api.anthropic.com/v1/messages";
 
 export async function parseTaskInput(userInput) {
-  const API_KEY = process.env.REACT_APP_ANTHROPIC_API_KEY;
+  console.log("Environment variables:", process.env);
+  const API_KEY = process.env.REACT_APP_SMARTS;
+
+  console.log("API_KEY:", API_KEY);
 
   if (!API_KEY) {
     console.error("Anthropic API key is not set");
