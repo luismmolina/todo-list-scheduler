@@ -1,8 +1,7 @@
-// src/claudeIntegration.js
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
-  apiKey: process.env.REACT_APP_ANTHROPIC_API_KEY,
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 export async function parseTaskInput(userInput) {

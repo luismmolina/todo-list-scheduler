@@ -7,6 +7,8 @@ export const theme = {
     accent: "#FBBC05",
     error: "#EA4335",
     surface: "#121212",
+    success: "#34A853",
+    warning: "#FBBC05",
   },
   fonts: {
     body: "'Roboto', sans-serif",

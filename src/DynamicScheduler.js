@@ -1,9 +1,4 @@
-import {
-  differenceInMinutes,
-  addMinutes,
-  setHours,
-  setMinutes,
-} from "date-fns";
+import { differenceInMinutes, addMinutes } from "date-fns";
 
 const TIME_BLOCKS = [
   { start: 8, end: 12, place: "home" },
@@ -121,12 +116,13 @@ export class DynamicScheduler {
           slotEnd.setDate(slotEnd.getDate() + 1);
         }
 
-        const conflictingTask = this.schedule.find(
-          (task) =>
+        const conflictingTask = this.schedule.find((task) => {
+          return (
             task.status !== "completed" &&
             currentTime < task.endTime &&
             addMinutes(currentTime, duration + BUFFER_TIME) > task.startTime
-        );
+          );
+        });
 
         if (
           !conflictingTask &&
