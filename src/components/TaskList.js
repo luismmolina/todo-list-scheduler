@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import styled from "styled-components";
 import { format } from "date-fns";
 import {
@@ -118,6 +118,12 @@ const Overlay = styled.div`
   display: ${(props) => (props.isOpen ? "block" : "none")};
 `;
 
+const SectionHeader = styled.h2`
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: ${(props) => props.theme.colors.text};
+`;
+
 const TaskList = ({
   tasks,
   deleteTask,
@@ -128,13 +134,30 @@ const TaskList = ({
 }) => {
   const [selectedTask, setSelectedTask] = useState(null);
 
+  const { activeTasks, completedTasks } = useMemo(() => {
+    const active = tasks
+      .filter((task) => task.status !== "completed")
+      .sort((a, b) => {
+        if (a.status === "ongoing" && b.status !== "ongoing") return -1;
+        if (b.status === "ongoing" && a.status !== "ongoing") return 1;
+        return (
+          (a.startTime || new Date(9999, 11, 31)) -
+          (b.startTime || new Date(9999, 11, 31))
+        );
+      });
+    const completed = tasks
+      .filter((task) => task.status === "completed")
+      .sort((a, b) => b.endTime - a.endTime);
+    return { activeTasks: active, completedTasks: completed };
+  }, [tasks]);
+
   const formatTime = (date) => {
     return date ? format(date, "h:mm a") : "Not set";
   };
 
   const getPriorityIcon = (priority) => {
     const level = getPriorityLevel(priority);
-    const colors = ["bronze", "silver", "gold"];
+    const colors = ["#CD7F32", "#C0C0C0", "#FFD700"];
     return <Star fill={colors[level - 1]} />;
   };
 
@@ -192,46 +215,52 @@ const TaskList = ({
     action: () => deleteTask(task.id),
   });
 
+  const renderTaskList = (taskList, isCompleted = false) => (
+    <SwipeableList>
+      {taskList.map((task) => (
+        <SwipeableListItem
+          key={task.id}
+          swipeRight={!isCompleted ? swipeRightOptions(task) : null}
+          swipeLeft={swipeLeftOptions(task)}
+        >
+          <TaskItem task={task} currentTime={currentTime}>
+            <TaskInfo>
+              <h3>{task.title}</h3>
+              <p>
+                {getPriorityIcon(task.priority)} {getPlaceIcon(task.place)}{" "}
+                <Clock /> {formatTaskDuration(task.duration)}
+              </p>
+              <p>Status: {task.status}</p>
+              <p>
+                Start: {formatTime(task.startTime)} | End:{" "}
+                {formatTime(task.endTime)}
+              </p>
+              {task.status === "ongoing" && (
+                <ProgressBar>
+                  <Progress
+                    progress={calculateTaskProgress(task, currentTime)}
+                  />
+                </ProgressBar>
+              )}
+            </TaskInfo>
+            {!isCompleted && (
+              <IconButton onClick={(e) => handleMoreClick(task, e)}>
+                <Edit />
+              </IconButton>
+            )}
+          </TaskItem>
+        </SwipeableListItem>
+      ))}
+    </SwipeableList>
+  );
+
   return (
     <>
-      <SwipeableList>
-        {tasks.map((task) => (
-          <SwipeableListItem
-            key={task.id}
-            swipeRight={
-              task.status !== "completed" ? swipeRightOptions(task) : null
-            }
-            swipeLeft={swipeLeftOptions(task)}
-          >
-            <TaskItem task={task} currentTime={currentTime}>
-              <TaskInfo>
-                <h3>{task.title}</h3>
-                <p>
-                  {getPriorityIcon(task.priority)} {getPlaceIcon(task.place)}{" "}
-                  <Clock /> {formatTaskDuration(task.duration)}
-                </p>
-                <p>Status: {task.status}</p>
-                <p>
-                  Start: {formatTime(task.startTime)} | End:{" "}
-                  {formatTime(task.endTime)}
-                </p>
-                {task.status === "ongoing" && (
-                  <ProgressBar>
-                    <Progress
-                      progress={calculateTaskProgress(task, currentTime)}
-                    />
-                  </ProgressBar>
-                )}
-              </TaskInfo>
-              {task.status !== "completed" && (
-                <IconButton onClick={(e) => handleMoreClick(task, e)}>
-                  <Edit />
-                </IconButton>
-              )}
-            </TaskItem>
-          </SwipeableListItem>
-        ))}
-      </SwipeableList>
+      <SectionHeader>Active Tasks</SectionHeader>
+      {renderTaskList(activeTasks)}
+
+      <SectionHeader>Completed Tasks</SectionHeader>
+      {renderTaskList(completedTasks, true)}
 
       <Overlay isOpen={selectedTask !== null} onClick={closeBottomSheet} />
       <BottomSheet isOpen={selectedTask !== null}>
