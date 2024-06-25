@@ -1,12 +1,14 @@
+// api/parse-task.js
+
 const fetch = require("node-fetch");
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const { userInput } = req.body;
-  const API_KEY = process.env.REACT_APP_SMARTS;
+  const API_KEY = process.env.ANTHROPIC_API_KEY;
   const API_URL = "https://api.anthropic.com/v1/messages";
 
   if (!API_KEY) {
@@ -54,4 +56,4 @@ export default async function handler(req, res) {
     console.error("Error parsing task input:", error);
     res.status(500).json({ error: "Error parsing task input" });
   }
-}
+};
