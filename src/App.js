@@ -110,7 +110,7 @@ const App = () => {
         currentTime
       );
       setReschedulingSuggestions(suggestions);
-      const summary = generateTimeBlockSummary(scheduler.schedule, currentTime);
+      const summary = generateTimeBlockSummary(scheduler.tasks, currentTime);
       setTimeBlockSummary(summary);
     }
   }, [scheduler, currentTime]);
@@ -279,30 +279,36 @@ const App = () => {
     ];
   };
 
-  const generateTimeBlockSummary = (schedule, currentTime) => {
+  const generateTimeBlockSummary = (tasks, currentTime) => {
     const summary = [];
     let currentBlock = null;
 
-    schedule.forEach((task) => {
-      if (!currentBlock || task.place !== currentBlock.place) {
-        if (currentBlock) {
-          summary.push(currentBlock);
+    tasks.sort((a, b) => a.startTime - b.startTime);
+
+    tasks.forEach((task) => {
+      if (task.startTime && task.endTime) {
+        if (!currentBlock || task.place !== currentBlock.place) {
+          if (currentBlock) {
+            summary.push(currentBlock);
+          }
+          currentBlock = {
+            place: task.place,
+            start: task.startTime,
+            end: task.endTime,
+            duration: task.duration,
+          };
+        } else {
+          currentBlock.end = task.endTime;
+          currentBlock.duration += task.duration;
         }
-        currentBlock = {
-          place: task.place,
-          start: task.startTime,
-          end: task.endTime,
-          duration: task.duration,
-        };
-      } else {
-        currentBlock.end = task.endTime;
-        currentBlock.duration += task.duration;
       }
     });
 
     if (currentBlock) {
       summary.push(currentBlock);
     }
+
+    console.log("Time block summary:", summary); // Add this line for debugging
 
     return summary;
   };
@@ -354,7 +360,7 @@ const App = () => {
           />
           <Content
             viewMode={viewMode}
-            tasks={scheduler ? scheduler.schedule : []}
+            tasks={scheduler ? scheduler.tasks : []}
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
             deleteTask={deleteTask}

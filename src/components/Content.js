@@ -24,10 +24,14 @@ const Content = ({
     (task) => task.status === "pending" || task.status === "ongoing"
   );
 
+  console.log("Active tasks:", activeTasks); // Add this line for debugging
+
   return (
     <ContentContainer>
       <h2>Active Tasks</h2>
-      {viewMode === "list" ? (
+      {activeTasks.length === 0 ? (
+        <p>No active tasks at the moment.</p>
+      ) : viewMode === "list" ? (
         <TaskList
           tasks={activeTasks}
           deleteTask={deleteTask}
