@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.1",
     "@emotion/react": "^11.11.4",
     "@mantine/core": "^7.10.2",
     "@mantine/dates": "^7.10.2",
