@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
-  apiKey: process.env.REACT_APP_ANTHROPIC_API_KEY, // Use REACT_APP_ prefix for client-side env variables
+  apiKey: process.env.REACT_APP_ANTHROPIC_API_KEY,
 });
 
 export async function parseTaskInput(userInput) {
@@ -33,6 +33,6 @@ export async function parseTaskInput(userInput) {
     return JSON.parse(response.content[0].text);
   } catch (error) {
     console.error("Error parsing task input:", error);
-    throw error; // Re-throw the error so it can be handled by the caller
+    return null;
   }
 }
