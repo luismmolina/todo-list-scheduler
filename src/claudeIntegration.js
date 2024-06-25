@@ -1,42 +1,11 @@
-const API_URL = "https://api.anthropic.com/v1/messages";
-
 export async function parseTaskInput(userInput) {
-  console.log("Environment variables:", process.env);
-  const API_KEY = process.env.REACT_APP_SMARTS;
-
-  console.log("API_KEY:", API_KEY);
-
-  if (!API_KEY) {
-    console.error("Anthropic API key is not set");
-    return null;
-  }
-
-  const prompt = `
-    Parse the following task input and extract these details:
-    - Task title
-    - Estimated duration (in minutes)
-    - Priority (must do, should do, if time available)
-    - Location (home, work, or unspecified)
-    - Deadline (if mentioned)
-
-    User input: "${userInput}"
-
-    Respond in JSON format.
-  `;
-
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetch("/api/parse-task", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": API_KEY,
-        "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }],
-      }),
+      body: JSON.stringify({ userInput }),
     });
 
     if (!response.ok) {
@@ -44,8 +13,7 @@ export async function parseTaskInput(userInput) {
     }
 
     const data = await response.json();
-    const content = data.content[0].text;
-    return JSON.parse(content);
+    return data;
   } catch (error) {
     console.error("Error parsing task input:", error);
     return null;
