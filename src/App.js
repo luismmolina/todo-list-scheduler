@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ThemeProvider } from "styled-components";
-import {
-  triageTasks,
-  adjustSchedule,
-  moveTaskToNextDay,
-  suggestRescheduling,
-  getTimeBlockSummary,
-} from "./components/schedulingUtils";
+import { parseTaskInput } from "./claudeIntegration";
+import { DynamicScheduler } from "./DynamicScheduler";
 import { theme } from "./styles/theme";
 import GlobalStyle from "./styles/globalStyles";
 import Header from "./components/Header";
@@ -17,8 +12,8 @@ import AddTaskForm from "./components/AddTaskForm";
 import MoveTaskModal from "./components/MoveTaskModal";
 import BottomNavigation from "./components/BottomNavigation";
 import TaskInsights from "./components/TaskInsights";
-
 import styled from "styled-components";
+import { differenceInMinutes, addDays, startOfDay } from "date-fns";
 
 const AppContainer = styled.div`
   display: flex;
@@ -60,164 +55,241 @@ const FAB = styled.button`
 const LOCAL_STORAGE_KEY = "todoListSchedulerTasks";
 
 const App = () => {
-  const [tasks, setTasks] = useState(() => {
-    const savedTasksString = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedTasksString) {
-      try {
-        const savedTasks = JSON.parse(savedTasksString);
-        const parsedTasks = savedTasks.map((task) => ({
-          ...task,
-          startTime: task.startTime ? new Date(task.startTime) : null,
-          endTime: task.endTime ? new Date(task.endTime) : null,
-        }));
-        return { scheduled: parsedTasks, deferred: [] };
-      } catch (error) {
-        console.error("Error parsing initial saved tasks:", error);
-        return { scheduled: [], deferred: [] };
-      }
-    }
-    return { scheduled: [], deferred: [] };
-  });
-
+  const [scheduler, setScheduler] = useState(null);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [viewMode, setViewMode] = useState("list");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [remainingTime, setRemainingTime] = useState(0);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [isMovingTask, setIsMovingTask] = useState(false);
   const [taskToMove, setTaskToMove] = useState(null);
   const [reschedulingSuggestions, setReschedulingSuggestions] = useState([]);
   const [timeBlockSummary, setTimeBlockSummary] = useState([]);
 
-  const updateTaskStatuses = useCallback((time, currentTasks) => {
-    const { scheduledTasks, deferredTasks, remainingTime } = triageTasks(
-      currentTasks,
-      time
-    );
-    setTasks({ scheduled: scheduledTasks, deferred: deferredTasks });
-    setRemainingTime(remainingTime);
+  useEffect(() => {
+    const savedTasksString = localStorage.getItem(LOCAL_STORAGE_KEY);
+    let initialTasks = [];
+    if (savedTasksString) {
+      try {
+        initialTasks = JSON.parse(savedTasksString).map((task) => ({
+          ...task,
+          startTime: task.startTime ? new Date(task.startTime) : null,
+          endTime: task.endTime ? new Date(task.endTime) : null,
+        }));
+      } catch (error) {
+        console.error("Error parsing initial saved tasks:", error);
+      }
+    }
+    const newScheduler = new DynamicScheduler(initialTasks, new Date());
+    setScheduler(newScheduler);
   }, []);
 
   useEffect(() => {
-    updateTaskStatuses(currentTime, tasks.scheduled);
-  }, [updateTaskStatuses, currentTime, tasks.scheduled]);
-
-  useEffect(() => {
-    const tasksToSave = [...tasks.scheduled, ...tasks.deferred];
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasksToSave));
-  }, [tasks]);
+    if (scheduler) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(scheduler.tasks));
+    }
+  }, [scheduler]);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime((prevTime) => {
         const newTime = new Date(prevTime.getTime() + 60000);
-        updateTaskStatuses(newTime, [...tasks.scheduled, ...tasks.deferred]);
+        if (scheduler) {
+          const updatedSchedule = scheduler.updateCurrentTime(newTime);
+          setScheduler(new DynamicScheduler(updatedSchedule, newTime));
+        }
         return newTime;
       });
     }, 60000);
     return () => clearInterval(timer);
-  }, [updateTaskStatuses, tasks]);
+  }, [scheduler]);
 
   useEffect(() => {
-    const updateInsights = () => {
-      const allTasks = [...tasks.scheduled, ...tasks.deferred];
-      const suggestions = suggestRescheduling(allTasks, currentTime);
+    if (scheduler) {
+      const suggestions = generateReschedulingSuggestions(
+        scheduler.tasks,
+        currentTime
+      );
       setReschedulingSuggestions(suggestions);
-      const summary = getTimeBlockSummary(currentTime);
+      const summary = generateTimeBlockSummary(scheduler.schedule, currentTime);
       setTimeBlockSummary(summary);
-    };
-
-    updateInsights();
-    const timer = setInterval(updateInsights, 5 * 60 * 1000); // Update every 5 minutes
-
-    return () => clearInterval(timer);
-  }, [currentTime, tasks]);
+    }
+  }, [scheduler, currentTime]);
 
   const addTask = useCallback(
-    (task) => {
-      updateTaskStatuses(currentTime, [
-        ...tasks.scheduled,
-        ...tasks.deferred,
-        task,
-      ]);
+    async (taskInput) => {
+      if (scheduler) {
+        const parsedTask = await parseTaskInput(taskInput);
+        if (parsedTask) {
+          const newTask = {
+            id: Date.now(),
+            ...parsedTask,
+            status: "pending",
+          };
+          const updatedSchedule = scheduler.addTask(newTask);
+          setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        }
+      }
       setIsAddingTask(false);
     },
-    [currentTime, tasks, updateTaskStatuses]
+    [scheduler, currentTime]
   );
 
   const deleteTask = useCallback(
     (taskId) => {
-      const updatedTasks = [...tasks.scheduled, ...tasks.deferred].filter(
-        (task) => task.id !== taskId
-      );
-      updateTaskStatuses(currentTime, updatedTasks);
+      if (scheduler) {
+        const updatedTasks = scheduler.tasks.filter(
+          (task) => task.id !== taskId
+        );
+        const updatedSchedule = new DynamicScheduler(
+          updatedTasks,
+          currentTime
+        ).optimizeSchedule();
+        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+      }
     },
-    [currentTime, tasks, updateTaskStatuses]
+    [scheduler, currentTime]
   );
 
   const completeTask = useCallback(
     (taskId) => {
-      const updatedTasks = [...tasks.scheduled, ...tasks.deferred].map((task) =>
-        task.id === taskId
-          ? { ...task, status: "completed", endTime: currentTime }
-          : task
-      );
-      updateTaskStatuses(currentTime, updatedTasks);
+      if (scheduler) {
+        const updatedSchedule = scheduler.completeTask(taskId);
+        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+      }
     },
-    [currentTime, tasks, updateTaskStatuses]
+    [scheduler, currentTime]
   );
 
   const editTask = useCallback(
     (taskId, updatedTask) => {
-      const updatedTasks = [...tasks.scheduled, ...tasks.deferred].map((task) =>
-        task.id === taskId ? { ...task, ...updatedTask } : task
-      );
-      updateTaskStatuses(currentTime, updatedTasks);
-    },
-    [currentTime, tasks, updateTaskStatuses]
-  );
-
-  const handleAdjustSchedule = useCallback(
-    (adjustments) => {
-      const { scheduledTasks, deferredTasks, remainingTime } = adjustSchedule(
-        [...tasks.scheduled, ...tasks.deferred],
-        adjustments,
-        currentTime
-      );
-      setTasks({ scheduled: scheduledTasks, deferred: deferredTasks });
-      setRemainingTime(remainingTime);
-    },
-    [currentTime, tasks]
-  );
-
-  const handleMoveToNextDay = useCallback(
-    (taskId) => {
-      const { scheduledTasks, deferredTasks, remainingTime } =
-        moveTaskToNextDay(
-          taskId,
-          [...tasks.scheduled, ...tasks.deferred],
-          currentTime
+      if (scheduler) {
+        const updatedTasks = scheduler.tasks.map((task) =>
+          task.id === taskId ? { ...task, ...updatedTask } : task
         );
-      setTasks({ scheduled: scheduledTasks, deferred: deferredTasks });
-      setRemainingTime(remainingTime);
+        const updatedSchedule = new DynamicScheduler(
+          updatedTasks,
+          currentTime
+        ).optimizeSchedule();
+        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+      }
     },
-    [currentTime, tasks]
+    [scheduler, currentTime]
   );
+
+  const handleMoveTask = (taskId, newDate) => {
+    if (scheduler) {
+      const updatedTasks = scheduler.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, startTime: newDate, status: "pending" }
+          : task
+      );
+      const updatedSchedule = new DynamicScheduler(
+        updatedTasks,
+        currentTime
+      ).optimizeSchedule();
+      setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+    }
+    setIsMovingTask(false);
+    setTaskToMove(null);
+  };
 
   const openMoveTaskModal = (task) => {
     setTaskToMove(task);
     setIsMovingTask(true);
   };
 
-  const handleMoveTask = (taskId, newDate) => {
-    const updatedTasks = [...tasks.scheduled, ...tasks.deferred].map((task) =>
-      task.id === taskId
-        ? { ...task, startTime: newDate, status: "pending" }
-        : task
+  const handleMoveToNextDay = (taskId) => {
+    if (scheduler) {
+      const task = scheduler.tasks.find((t) => t.id === taskId);
+      if (task) {
+        const nextDay = addDays(startOfDay(currentTime), 1);
+        const updatedTask = { ...task, startTime: nextDay, status: "pending" };
+        const updatedTasks = scheduler.tasks.map((t) =>
+          t.id === taskId ? updatedTask : t
+        );
+        const updatedSchedule = new DynamicScheduler(
+          updatedTasks,
+          currentTime
+        ).optimizeSchedule();
+        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+      }
+    }
+  };
+
+  const handleAdjustSchedule = (adjustments) => {
+    if (scheduler) {
+      const updatedTasks = scheduler.tasks.map((task) => {
+        const adjustment = adjustments.find((adj) => adj.id === task.id);
+        return adjustment ? { ...task, ...adjustment } : task;
+      });
+      const updatedSchedule = new DynamicScheduler(
+        updatedTasks,
+        currentTime
+      ).optimizeSchedule();
+      setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+    }
+  };
+
+  const generateReschedulingSuggestions = (tasks, currentTime) => {
+    const overdueTasks = tasks.filter(
+      (task) =>
+        task.status === "pending" &&
+        task.startTime &&
+        task.startTime < currentTime
     );
-    updateTaskStatuses(currentTime, updatedTasks);
-    setIsMovingTask(false);
-    setTaskToMove(null);
+    const upcomingTasks = tasks.filter(
+      (task) =>
+        task.status === "pending" &&
+        task.startTime &&
+        differenceInMinutes(task.startTime, currentTime) <= 30
+    );
+    const deferredTasks = tasks.filter((task) => task.status === "deferred");
+
+    return [
+      ...overdueTasks.map((task) => ({
+        task,
+        reason: "This task is overdue.",
+        suggestion: "Reschedule for today or move to tomorrow.",
+      })),
+      ...upcomingTasks.map((task) => ({
+        task,
+        reason: "This task is starting soon.",
+        suggestion: "Prepare to start this task or reschedule if needed.",
+      })),
+      ...deferredTasks.map((task) => ({
+        task,
+        reason: "This task couldn't be scheduled.",
+        suggestion: "Consider adjusting its priority or duration.",
+      })),
+    ];
+  };
+
+  const generateTimeBlockSummary = (schedule, currentTime) => {
+    const summary = [];
+    let currentBlock = null;
+
+    schedule.forEach((task) => {
+      if (!currentBlock || task.place !== currentBlock.place) {
+        if (currentBlock) {
+          summary.push(currentBlock);
+        }
+        currentBlock = {
+          place: task.place,
+          start: task.startTime,
+          end: task.endTime,
+          duration: task.duration,
+        };
+      } else {
+        currentBlock.end = task.endTime;
+        currentBlock.duration += task.duration;
+      }
+    });
+
+    if (currentBlock) {
+      summary.push(currentBlock);
+    }
+
+    return summary;
   };
 
   return (
@@ -226,19 +298,23 @@ const App = () => {
       <AppContainer>
         <Header
           currentTime={currentTime}
-          remainingTime={remainingTime}
+          remainingTime={scheduler ? scheduler.getRemainingTime() : 0}
           setViewMode={setViewMode}
           setIsAddingTask={setIsAddingTask}
         />
         <Main>
           <Sidebar
-            tasks={tasks.deferred}
+            tasks={
+              scheduler
+                ? scheduler.tasks.filter((t) => t.status === "deferred")
+                : []
+            }
             handleMoveToNextDay={handleMoveToNextDay}
             handleAdjustSchedule={handleAdjustSchedule}
           />
           <Content
             viewMode={viewMode}
-            tasks={tasks.scheduled}
+            tasks={scheduler ? scheduler.schedule : []}
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
             deleteTask={deleteTask}
@@ -274,7 +350,7 @@ const App = () => {
                 task={taskToMove}
                 onMove={handleMoveTask}
                 onCancel={() => setIsMovingTask(false)}
-                currentTasks={[...tasks.scheduled, ...tasks.deferred]}
+                currentTasks={scheduler ? scheduler.tasks : []}
                 currentTime={currentTime}
               />
             </ModalContent>
