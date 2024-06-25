@@ -1,11 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.REACT_APP_ANTHROPIC_API_KEY, // Use REACT_APP_ prefix for client-side env variables
 });
 
 export async function parseTaskInput(userInput) {
   try {
+    if (!process.env.REACT_APP_ANTHROPIC_API_KEY) {
+      throw new Error("Anthropic API key is not set in environment variables");
+    }
+
     const response = await anthropic.messages.create({
       max_tokens: 1024,
       messages: [
@@ -29,6 +33,6 @@ export async function parseTaskInput(userInput) {
     return JSON.parse(response.content[0].text);
   } catch (error) {
     console.error("Error parsing task input:", error);
-    return null;
+    throw error; // Re-throw the error so it can be handled by the caller
   }
 }
