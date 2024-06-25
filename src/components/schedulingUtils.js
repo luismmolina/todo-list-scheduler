@@ -1,19 +1,23 @@
-// schedulingUtils.js
-const timeSlots = [
-  { start: 8, end: 15, place: "home" },
-  { start: 15, end: 20, place: "work" },
-  { start: 20, end: 23, place: "home" },
-  { start: 23, end: 8, place: "sleep" },
+import { differenceInMinutes, addMinutes } from "date-fns";
+
+const BUFFER_TIME = 10; // 10 minutes buffer between tasks
+const TIME_BLOCKS = [
+  { start: 8, end: 12, place: "home" },
+  { start: 12, end: 13, place: "break" },
+  { start: 13, end: 17, place: "work" },
+  { start: 17, end: 22, place: "home" },
+  { start: 22, end: 8, place: "sleep" },
 ];
 
 const priorityOrder = ["must do", "should do", "if time available"];
-const BUFFER_TIME = 10; // 10 minutes buffer between tasks
 
-const isConflicting = (taskStartTime, taskDuration, existingTask) => {
-  const taskEndTime = new Date(taskStartTime.getTime() + taskDuration * 60000);
-  return (
-    taskStartTime < existingTask.endTime && taskEndTime > existingTask.startTime
-  );
+const calculateTaskScore = (task, currentTime) => {
+  const priorityScore = priorityOrder.indexOf(task.priority) * 10;
+  const urgencyScore = task.deadline
+    ? Math.max(0, 100 - differenceInMinutes(task.deadline, currentTime) / 60)
+    : 0;
+  const durationScore = Math.min(task.duration, 120) / 2; // Favor shorter tasks, max score for 4 hours
+  return priorityScore + urgencyScore + durationScore;
 };
 
 const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
@@ -23,7 +27,7 @@ const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
 
   while (currentTime < endOfDay) {
     const currentHour = currentTime.getHours();
-    const slot = timeSlots.find(
+    const slot = TIME_BLOCKS.find(
       (slot) =>
         ((currentHour >= slot.start && currentHour < slot.end) ||
           (slot.start > slot.end &&
@@ -41,12 +45,13 @@ const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
       const conflictingTask = existingTasks.find(
         (task) =>
           task.status !== "completed" &&
-          isConflicting(currentTime, duration + BUFFER_TIME, task)
+          currentTime < task.endTime &&
+          addMinutes(currentTime, duration + BUFFER_TIME) > task.startTime
       );
 
       if (
         !conflictingTask &&
-        (slotEnd - currentTime) / 60000 >= duration + BUFFER_TIME
+        differenceInMinutes(slotEnd, currentTime) >= duration + BUFFER_TIME
       ) {
         return currentTime;
       }
@@ -56,10 +61,11 @@ const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
           conflictingTask.endTime.getTime() + BUFFER_TIME * 60000
         );
       } else {
-        currentTime.setMinutes(currentTime.getMinutes() + 1);
+        currentTime = addMinutes(currentTime, 1);
       }
     } else {
-      currentTime.setHours(currentTime.getHours() + 1, 0, 0, 0);
+      currentTime = addMinutes(currentTime, 60);
+      currentTime.setMinutes(0, 0, 0);
     }
   }
 
@@ -75,15 +81,10 @@ export const scheduleTask = (task, currentTime, existingTasks) => {
   );
 
   if (!startTime) {
-    return {
-      ...task,
-      status: "deferred",
-      startTime: null,
-      endTime: null,
-    };
+    return { ...task, status: "deferred", startTime: null, endTime: null };
   }
 
-  const endTime = new Date(startTime.getTime() + task.duration * 60000);
+  const endTime = addMinutes(startTime, task.duration);
 
   let status = "pending";
   if (startTime <= currentTime && endTime > currentTime) {
@@ -92,12 +93,7 @@ export const scheduleTask = (task, currentTime, existingTasks) => {
     status = "overdue";
   }
 
-  return {
-    ...task,
-    startTime,
-    endTime,
-    status,
-  };
+  return { ...task, startTime, endTime, status };
 };
 
 export const triageTasks = (tasks, currentTime) => {
@@ -107,16 +103,12 @@ export const triageTasks = (tasks, currentTime) => {
     bedTime.setDate(bedTime.getDate() + 1);
   }
 
-  let availableTime = (bedTime - currentTime) / 60000;
+  let availableTime = differenceInMinutes(bedTime, currentTime);
 
-  const sortedTasks = [...tasks].sort((a, b) => {
-    if (a.status === "completed" && b.status !== "completed") return 1;
-    if (b.status === "completed" && a.status !== "completed") return -1;
-    const priorityDiff =
-      priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority);
-    if (priorityDiff !== 0) return priorityDiff;
-    return (a.startTime || new Date(0)) - (b.startTime || new Date(0));
-  });
+  const sortedTasks = [...tasks].sort(
+    (a, b) =>
+      calculateTaskScore(b, currentTime) - calculateTaskScore(a, currentTime)
+  );
 
   let scheduledTasks = [];
   let deferredTasks = [];
@@ -138,6 +130,61 @@ export const triageTasks = (tasks, currentTime) => {
   availableTime = Math.max(0, availableTime);
 
   return { scheduledTasks, deferredTasks, remainingTime: availableTime };
+};
+
+export const suggestRescheduling = (tasks, currentTime) => {
+  const { scheduledTasks, deferredTasks } = triageTasks(tasks, currentTime);
+
+  const overdueTasks = scheduledTasks.filter(
+    (task) => task.status === "overdue"
+  );
+  const tightScheduleTasks = scheduledTasks.filter(
+    (task) =>
+      task.status === "pending" &&
+      differenceInMinutes(task.startTime, currentTime) < 30
+  );
+
+  const suggestedRescheduling = [
+    ...overdueTasks.map((task) => ({
+      task,
+      reason: "This task is overdue.",
+      suggestion: "Reschedule for today or move to tomorrow.",
+    })),
+    ...tightScheduleTasks.map((task) => ({
+      task,
+      reason:
+        "This task is scheduled to start soon, but you might not have enough time.",
+      suggestion: "Consider rescheduling or adjusting the duration.",
+    })),
+    ...deferredTasks.map((task) => ({
+      task,
+      reason: "This task couldn't be scheduled today.",
+      suggestion: "Try scheduling for tomorrow or adjusting its priority.",
+    })),
+  ];
+
+  return suggestedRescheduling;
+};
+
+export const getTimeBlockSummary = (currentTime) => {
+  const summaries = TIME_BLOCKS.map((block) => {
+    const blockStart = new Date(currentTime);
+    blockStart.setHours(block.start, 0, 0, 0);
+    const blockEnd = new Date(currentTime);
+    blockEnd.setHours(block.end, 0, 0, 0);
+    if (block.end < block.start) {
+      blockEnd.setDate(blockEnd.getDate() + 1);
+    }
+
+    return {
+      place: block.place,
+      start: blockStart,
+      end: blockEnd,
+      duration: differenceInMinutes(blockEnd, blockStart),
+    };
+  });
+
+  return summaries;
 };
 
 export const adjustSchedule = (tasks, adjustments, currentTime) => {

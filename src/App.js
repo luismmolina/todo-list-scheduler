@@ -5,6 +5,8 @@ import {
   adjustSchedule,
   moveTaskToNextDay,
   rescheduleOverdueTasks,
+  suggestRescheduling,
+  getTimeBlockSummary,
 } from "./components/schedulingUtils";
 import { theme } from "./styles/theme";
 import GlobalStyle from "./styles/globalStyles";
@@ -15,6 +17,7 @@ import { Modal, ModalContent } from "./components/Modal";
 import AddTaskForm from "./components/AddTaskForm";
 import MoveTaskModal from "./components/MoveTaskModal";
 import BottomNavigation from "./components/BottomNavigation";
+import TaskInsights from "./components/TaskInsights";
 
 import styled from "styled-components";
 
@@ -77,16 +80,15 @@ const App = () => {
     return { scheduled: [], deferred: [] };
   });
 
-  const [currentTime, setCurrentTime] = useState(() => {
-    const now = new Date();
-    return now;
-  });
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const [viewMode, setViewMode] = useState("list");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [remainingTime, setRemainingTime] = useState(0);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [isMovingTask, setIsMovingTask] = useState(false);
   const [taskToMove, setTaskToMove] = useState(null);
+  const [reschedulingSuggestions, setReschedulingSuggestions] = useState([]);
+  const [timeBlockSummary, setTimeBlockSummary] = useState([]);
 
   const updateTaskStatuses = useCallback((time, currentTasks) => {
     const { scheduledTasks, deferredTasks, remainingTime } = triageTasks(
@@ -116,6 +118,21 @@ const App = () => {
     }, 60000);
     return () => clearInterval(timer);
   }, [updateTaskStatuses, tasks]);
+
+  useEffect(() => {
+    const updateInsights = () => {
+      const allTasks = [...tasks.scheduled, ...tasks.deferred];
+      const suggestions = suggestRescheduling(allTasks, currentTime);
+      setReschedulingSuggestions(suggestions);
+      const summary = getTimeBlockSummary(currentTime);
+      setTimeBlockSummary(summary);
+    };
+
+    updateInsights();
+    const timer = setInterval(updateInsights, 5 * 60 * 1000); // Update every 5 minutes
+
+    return () => clearInterval(timer);
+  }, [currentTime, tasks]);
 
   const addTask = useCallback(
     (task) => {
@@ -240,6 +257,10 @@ const App = () => {
             editTask={editTask}
             currentTime={currentTime}
             openMoveTaskModal={openMoveTaskModal}
+          />
+          <TaskInsights
+            reschedulingSuggestions={reschedulingSuggestions}
+            timeBlockSummary={timeBlockSummary}
           />
         </Main>
         <BottomNavigation
