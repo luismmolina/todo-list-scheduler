@@ -71,20 +71,33 @@ module.exports = async (req, res) => {
       }),
     });
 
+    console.log("Anthropic API response status:", response.status);
+
     if (!response.ok) {
       console.log("Anthropic API error:", response.status, response.statusText);
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(
+        `Anthropic API error: ${response.status} ${response.statusText}`
+      );
     }
 
     const data = await response.json();
-    console.log("Anthropic API response:", data);
+    console.log("Anthropic API response data:", data);
+
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      throw new Error("Unexpected response format from Anthropic API");
+    }
+
     const content = data.content[0].text;
+    console.log("Parsed content:", content);
+
     const parsedTask = JSON.parse(content);
     console.log("Parsed task:", parsedTask);
 
     res.status(200).json(parsedTask);
   } catch (error) {
-    console.error("Error parsing task input:", error);
-    res.status(500).json({ error: "Error parsing task input" });
+    console.error("Error in parse-task function:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Error parsing task input" });
   }
 };

@@ -139,6 +139,7 @@ const App = () => {
             "Failed to parse task:",
             parsedTask?.error || "Unknown error"
           );
+          // You might want to show an error message to the user here
         }
       } else {
         console.error("Scheduler is not initialized");

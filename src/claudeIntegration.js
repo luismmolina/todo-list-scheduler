@@ -17,7 +17,11 @@ export async function parseTaskInput(taskInput) {
     console.log("Received response:", response.status, response.statusText);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error("Error response body:", errorText);
+      throw new Error(
+        `HTTP error! status: ${response.status}, body: ${errorText}`
+      );
     }
 
     const data = await response.json();
@@ -26,6 +30,6 @@ export async function parseTaskInput(taskInput) {
   } catch (error) {
     console.error("Error parsing task input:", error);
     console.error("Error details:", error.message);
-    return null;
+    return { error: error.message };
   }
 }
