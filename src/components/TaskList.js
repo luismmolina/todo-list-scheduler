@@ -1,12 +1,27 @@
-import React from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
 import { format } from "date-fns";
-import { Clock, Home, Briefcase, Star, CheckCircle } from "lucide-react";
+import {
+  Clock,
+  Home,
+  Briefcase,
+  Star,
+  MoreVertical,
+  Check,
+  Trash2,
+  Edit,
+  Move,
+} from "lucide-react";
+import {
+  SwipeableList,
+  SwipeableListItem,
+} from "@sandstreamdev/react-swipeable-list";
+import "@sandstreamdev/react-swipeable-list/dist/styles.css";
 
 const TaskItem = styled.div`
   background-color: ${(props) => props.theme.colors.surface};
   padding: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   border-radius: 4px;
   border-left: 4px solid
     ${(props) => {
@@ -23,17 +38,22 @@ const TaskItem = styled.div`
           return props.theme.colors.text;
       }
     }};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 `;
 
-const Button = styled.button`
-  background-color: ${(props) => props.theme.colors.primary};
-  color: ${(props) => props.theme.colors.text};
+const TaskInfo = styled.div`
+  flex: 1;
+`;
+
+const IconButton = styled.button`
+  background: none;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  color: ${(props) => props.theme.colors.text};
   cursor: pointer;
-  font-size: 0.9rem;
-  margin-right: 0.5rem;
+  padding: 0.5rem;
+  margin-left: 0.5rem;
 `;
 
 const ProgressBar = styled.div`
@@ -49,6 +69,30 @@ const Progress = styled.div`
   background-color: ${(props) => props.theme.colors.secondary};
 `;
 
+const MoreMenu = styled.div`
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background-color: ${(props) => props.theme.colors.surface};
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+`;
+
+const MenuItem = styled.button`
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  text-align: left;
+  background: none;
+  border: none;
+  color: ${(props) => props.theme.colors.text};
+  cursor: pointer;
+  &:hover {
+    background-color: ${(props) => props.theme.colors.primary};
+  }
+`;
+
 const TaskList = ({
   tasks,
   deleteTask,
@@ -57,6 +101,8 @@ const TaskList = ({
   currentTime,
   openMoveTaskModal,
 }) => {
+  const [openMenuId, setOpenMenuId] = useState(null);
+
   const formatTime = (date) => {
     return date ? format(date, "h:mm a") : "Not set";
   };
@@ -92,62 +138,121 @@ const TaskList = ({
     }
   };
 
+  const handleMoreClick = (taskId) => {
+    setOpenMenuId(openMenuId === taskId ? null : taskId);
+  };
+
+  const swipeRightOptions = (task) => ({
+    content: (
+      <div
+        style={{
+          background: "green",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          padding: "0 1rem",
+        }}
+      >
+        <Check color="white" />
+      </div>
+    ),
+    action: () => completeTask(task.id),
+  });
+
+  const swipeLeftOptions = (task) => ({
+    content: (
+      <div
+        style={{
+          background: "red",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          padding: "0 1rem",
+        }}
+      >
+        <Trash2 color="white" />
+      </div>
+    ),
+    action: () => deleteTask(task.id),
+  });
+
   return (
-    <div>
-      <h2>Scheduled Tasks</h2>
+    <SwipeableList>
       {tasks.map((task) => (
-        <TaskItem key={task.id} status={task.status}>
-          <h3>{task.title}</h3>
-          <p>
-            {getPriorityIcon(task.priority)} {getPlaceIcon(task.place)}{" "}
-            <Clock /> {task.duration} minutes
-          </p>
-          <p>Status: {task.status}</p>
-          <p>Start Time: {formatTime(task.startTime)}</p>
-          <p>End Time: {formatTime(task.endTime)}</p>
-          {task.status === "ongoing" && (
-            <ProgressBar>
-              <Progress progress={calculateProgress(task)} />
-            </ProgressBar>
-          )}
-          {task.status !== "completed" && (
-            <>
-              <Button onClick={() => completeTask(task.id)}>
-                <CheckCircle /> Complete
-              </Button>
-              <Button onClick={() => deleteTask(task.id)}>Delete</Button>
-              <Button onClick={() => openMoveTaskModal(task)}>Move</Button>
-              <Button
-                onClick={() => {
-                  const newDuration = prompt(
-                    "Enter new duration (in minutes):",
-                    task.duration
-                  );
-                  if (newDuration) {
-                    editTask(task.id, { duration: parseInt(newDuration) });
-                  }
-                }}
-              >
-                Edit Duration
-              </Button>
-              <Button
-                onClick={() => {
-                  const newPriority = prompt(
-                    "Enter new priority (must do, should do, if time available):",
-                    task.priority
-                  );
-                  if (newPriority) {
-                    editTask(task.id, { priority: newPriority });
-                  }
-                }}
-              >
-                Edit Priority
-              </Button>
-            </>
-          )}
-        </TaskItem>
+        <SwipeableListItem
+          key={task.id}
+          swipeRight={
+            task.status !== "completed" ? swipeRightOptions(task) : null
+          }
+          swipeLeft={swipeLeftOptions(task)}
+        >
+          <TaskItem status={task.status}>
+            <TaskInfo>
+              <h3>{task.title}</h3>
+              <p>
+                {getPriorityIcon(task.priority)} {getPlaceIcon(task.place)}{" "}
+                <Clock /> {task.duration} minutes
+              </p>
+              <p>Status: {task.status}</p>
+              <p>
+                Start: {formatTime(task.startTime)} | End:{" "}
+                {formatTime(task.endTime)}
+              </p>
+              {task.status === "ongoing" && (
+                <ProgressBar>
+                  <Progress progress={calculateProgress(task)} />
+                </ProgressBar>
+              )}
+            </TaskInfo>
+            {task.status !== "completed" && (
+              <div style={{ position: "relative" }}>
+                <IconButton onClick={() => handleMoreClick(task.id)}>
+                  <MoreVertical />
+                </IconButton>
+                {openMenuId === task.id && (
+                  <MoreMenu>
+                    <MenuItem
+                      onClick={() => {
+                        editTask(task.id, {
+                          duration: prompt(
+                            "Enter new duration (in minutes):",
+                            task.duration
+                          ),
+                        });
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      <Edit size={16} /> Edit Duration
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        editTask(task.id, {
+                          priority: prompt(
+                            "Enter new priority:",
+                            task.priority
+                          ),
+                        });
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      <Star size={16} /> Edit Priority
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        openMoveTaskModal(task);
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      <Move size={16} /> Move Task
+                    </MenuItem>
+                  </MoreMenu>
+                )}
+              </div>
+            )}
+          </TaskItem>
+        </SwipeableListItem>
       ))}
-    </div>
+    </SwipeableList>
   );
 };
 
