@@ -6,7 +6,6 @@ import {
   Home,
   Briefcase,
   Star,
-  MoreVertical,
   Check,
   Trash2,
   Edit,
@@ -18,6 +17,12 @@ import {
   SwipeableListItem,
 } from "@sandstreamdev/react-swipeable-list";
 import "@sandstreamdev/react-swipeable-list/dist/styles.css";
+import {
+  calculateTaskProgress,
+  getPriorityLevel,
+  formatTaskDuration,
+  getTaskStatusColor,
+} from "./taskUtils";
 
 const TaskItem = styled.div`
   background-color: ${(props) => props.theme.colors.surface};
@@ -25,20 +30,7 @@ const TaskItem = styled.div`
   margin-bottom: 0.5rem;
   border-radius: 4px;
   border-left: 4px solid
-    ${(props) => {
-      switch (props.status) {
-        case "pending":
-          return props.theme.colors.primary;
-        case "ongoing":
-          return props.theme.colors.secondary;
-        case "overdue":
-          return props.theme.colors.error;
-        case "completed":
-          return props.theme.colors.accent;
-        default:
-          return props.theme.colors.text;
-      }
-    }};
+    ${(props) => getTaskStatusColor(props.task, props.theme, props.currentTime)};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -140,24 +132,10 @@ const TaskList = ({
     return date ? format(date, "h:mm a") : "Not set";
   };
 
-  const calculateProgress = (task) => {
-    if (task.status !== "ongoing") return 0;
-    const elapsed = currentTime - task.startTime;
-    const total = task.endTime - task.startTime;
-    return Math.min(100, (elapsed / total) * 100);
-  };
-
   const getPriorityIcon = (priority) => {
-    switch (priority) {
-      case "must do":
-        return <Star fill="gold" />;
-      case "should do":
-        return <Star fill="silver" />;
-      case "if time available":
-        return <Star fill="bronze" />;
-      default:
-        return null;
-    }
+    const level = getPriorityLevel(priority);
+    const colors = ["bronze", "silver", "gold"];
+    return <Star fill={colors[level - 1]} />;
   };
 
   const getPlaceIcon = (place) => {
@@ -225,12 +203,12 @@ const TaskList = ({
             }
             swipeLeft={swipeLeftOptions(task)}
           >
-            <TaskItem status={task.status}>
+            <TaskItem task={task} currentTime={currentTime}>
               <TaskInfo>
                 <h3>{task.title}</h3>
                 <p>
                   {getPriorityIcon(task.priority)} {getPlaceIcon(task.place)}{" "}
-                  <Clock /> {task.duration} minutes
+                  <Clock /> {formatTaskDuration(task.duration)}
                 </p>
                 <p>Status: {task.status}</p>
                 <p>
@@ -239,13 +217,15 @@ const TaskList = ({
                 </p>
                 {task.status === "ongoing" && (
                   <ProgressBar>
-                    <Progress progress={calculateProgress(task)} />
+                    <Progress
+                      progress={calculateTaskProgress(task, currentTime)}
+                    />
                   </ProgressBar>
                 )}
               </TaskInfo>
               {task.status !== "completed" && (
                 <IconButton onClick={(e) => handleMoreClick(task, e)}>
-                  <MoreVertical />
+                  <Edit />
                 </IconButton>
               )}
             </TaskItem>

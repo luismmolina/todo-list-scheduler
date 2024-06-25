@@ -4,7 +4,6 @@ import {
   triageTasks,
   adjustSchedule,
   moveTaskToNextDay,
-  rescheduleOverdueTasks,
   suggestRescheduling,
   getTimeBlockSummary,
 } from "./components/schedulingUtils";
@@ -101,7 +100,7 @@ const App = () => {
 
   useEffect(() => {
     updateTaskStatuses(currentTime, tasks.scheduled);
-  }, []);
+  }, [updateTaskStatuses, currentTime, tasks.scheduled]);
 
   useEffect(() => {
     const tasksToSave = [...tasks.scheduled, ...tasks.deferred];
@@ -220,16 +219,6 @@ const App = () => {
     setIsMovingTask(false);
     setTaskToMove(null);
   };
-
-  const handleRescheduleOverdueTasks = useCallback(() => {
-    const { scheduledTasks, deferredTasks, remainingTime } =
-      rescheduleOverdueTasks(
-        [...tasks.scheduled, ...tasks.deferred],
-        currentTime
-      );
-    setTasks({ scheduled: scheduledTasks, deferred: deferredTasks });
-    setRemainingTime(remainingTime);
-  }, [currentTime, tasks]);
 
   return (
     <ThemeProvider theme={theme}>

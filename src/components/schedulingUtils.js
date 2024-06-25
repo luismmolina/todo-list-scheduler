@@ -213,14 +213,3 @@ export const moveTaskToNextDay = (taskId, tasks, currentTime) => {
 
   return triageTasks(updatedTasks, currentTime);
 };
-
-export const rescheduleOverdueTasks = (tasks, currentTime) => {
-  const updatedTasks = tasks.map((task) => {
-    if (task.status === "overdue") {
-      return { ...task, startTime: null, endTime: null, status: "pending" };
-    }
-    return task;
-  });
-
-  return triageTasks(updatedTasks, currentTime);
-};
