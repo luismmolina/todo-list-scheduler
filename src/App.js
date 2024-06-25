@@ -4,6 +4,7 @@ import {
   triageTasks,
   adjustSchedule,
   moveTaskToNextDay,
+  rescheduleOverdueTasks,
 } from "./components/schedulingUtils";
 import { theme } from "./styles/theme";
 import GlobalStyle from "./styles/globalStyles";
@@ -13,6 +14,7 @@ import Content from "./components/Content";
 import { Modal, ModalContent } from "./components/Modal";
 import AddTaskForm from "./components/AddTaskForm";
 import MoveTaskModal from "./components/MoveTaskModal";
+import BottomNavigation from "./components/BottomNavigation";
 
 import styled from "styled-components";
 
@@ -33,6 +35,24 @@ const Main = styled.main`
   @media (min-width: 769px) {
     flex-direction: row;
   }
+`;
+
+const FAB = styled.button`
+  position: fixed;
+  bottom: 70px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background-color: ${(props) => props.theme.colors.primary};
+  color: ${(props) => props.theme.colors.text};
+  border: none;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
 `;
 
 const LOCAL_STORAGE_KEY = "todoListSchedulerTasks";
@@ -59,7 +79,6 @@ const App = () => {
 
   const [currentTime, setCurrentTime] = useState(() => {
     const now = new Date();
-
     return now;
   });
   const [viewMode, setViewMode] = useState("list");
@@ -91,7 +110,6 @@ const App = () => {
     const timer = setInterval(() => {
       setCurrentTime((prevTime) => {
         const newTime = new Date(prevTime.getTime() + 60000);
-
         updateTaskStatuses(newTime, [...tasks.scheduled, ...tasks.deferred]);
         return newTime;
       });
@@ -186,6 +204,16 @@ const App = () => {
     setTaskToMove(null);
   };
 
+  const handleRescheduleOverdueTasks = useCallback(() => {
+    const { scheduledTasks, deferredTasks, remainingTime } =
+      rescheduleOverdueTasks(
+        [...tasks.scheduled, ...tasks.deferred],
+        currentTime
+      );
+    setTasks({ scheduled: scheduledTasks, deferred: deferredTasks });
+    setRemainingTime(remainingTime);
+  }, [currentTime, tasks]);
+
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
@@ -214,6 +242,11 @@ const App = () => {
             openMoveTaskModal={openMoveTaskModal}
           />
         </Main>
+        <BottomNavigation
+          setViewMode={setViewMode}
+          setIsAddingTask={setIsAddingTask}
+        />
+        <FAB onClick={() => setIsAddingTask(true)}>+</FAB>
         {isAddingTask && (
           <Modal>
             <ModalContent>
