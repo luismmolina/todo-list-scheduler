@@ -2,13 +2,16 @@
 
 export async function parseTaskInput(userInput) {
   try {
-    const response = await fetch("/api/parse-task", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userInput }),
-    });
+    const response = await fetch(
+      "https://todo-list-scheduler.vercel.app/api/parse-task",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userInput }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
