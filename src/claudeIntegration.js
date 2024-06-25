@@ -1,7 +1,7 @@
 const API_URL = "https://api.anthropic.com/v1/messages";
 
 export async function parseTaskInput(userInput) {
-  const API_KEY = process.env.SMARTS;
+  const API_KEY = process.env.NEXT_PUBLIC_SMARTS;
 
   if (!API_KEY) {
     console.error("Anthropic API key is not set");
