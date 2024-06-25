@@ -99,6 +99,14 @@ export class DynamicScheduler {
     const endOfDay = new Date(currentTime);
     endOfDay.setHours(24, 0, 0, 0);
 
+    const isConflicting = (task) => {
+      return (
+        task.status !== "completed" &&
+        currentTime < task.endTime &&
+        addMinutes(currentTime, duration + BUFFER_TIME) > task.startTime
+      );
+    };
+
     while (currentTime < endOfDay) {
       const currentHour = currentTime.getHours();
       const slot = TIME_BLOCKS.find(
@@ -116,13 +124,7 @@ export class DynamicScheduler {
           slotEnd.setDate(slotEnd.getDate() + 1);
         }
 
-        const conflictingTask = this.schedule.find((task) => {
-          return (
-            task.status !== "completed" &&
-            currentTime < task.endTime &&
-            addMinutes(currentTime, duration + BUFFER_TIME) > task.startTime
-          );
-        });
+        const conflictingTask = this.schedule.find(isConflicting);
 
         if (
           !conflictingTask &&

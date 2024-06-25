@@ -2,10 +2,10 @@ import { differenceInMinutes, addMinutes } from "date-fns";
 
 const BUFFER_TIME = 10; // 10 minutes buffer between tasks
 const TIME_BLOCKS = [
-  { start: 8, end: 14.5, place: "home" },
-  { start: 15, end: 17, place: "work" },
+  { start: 8, end: 12, place: "home" },
+  { start: 12, end: 13, place: "break" },
+  { start: 13, end: 17, place: "work" },
   { start: 17, end: 22, place: "home" },
-  { start: 8, end: 22, place: "anytime" },
   { start: 22, end: 8, place: "sleep" },
 ];
 
@@ -20,10 +20,20 @@ const calculateTaskScore = (task, currentTime) => {
   return priorityScore + urgencyScore + durationScore;
 };
 
-const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
+export const findNextSlot = (startTime, duration, taskPlace, schedule) => {
   let currentTime = new Date(startTime);
   const endOfDay = new Date(currentTime);
   endOfDay.setHours(24, 0, 0, 0);
+
+  const isConflicting = (task) => {
+    const taskStartTime = new Date(task.startTime);
+    const taskEndTime = new Date(task.endTime);
+    return (
+      task.status !== "completed" &&
+      currentTime < taskEndTime &&
+      addMinutes(currentTime, duration + BUFFER_TIME) > taskStartTime
+    );
+  };
 
   while (currentTime < endOfDay) {
     const currentHour = currentTime.getHours();
@@ -42,12 +52,7 @@ const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
         slotEnd.setDate(slotEnd.getDate() + 1);
       }
 
-      const conflictingTask = existingTasks.find(
-        (task) =>
-          task.status !== "completed" &&
-          currentTime < task.endTime &&
-          addMinutes(currentTime, duration + BUFFER_TIME) > task.startTime
-      );
+      const conflictingTask = schedule.find(isConflicting);
 
       if (
         !conflictingTask &&
@@ -58,7 +63,7 @@ const findNextSlot = (startTime, taskPlace, duration, existingTasks) => {
 
       if (conflictingTask) {
         currentTime = new Date(
-          conflictingTask.endTime.getTime() + BUFFER_TIME * 60000
+          new Date(conflictingTask.endTime).getTime() + BUFFER_TIME * 60000
         );
       } else {
         currentTime = addMinutes(currentTime, 1);
