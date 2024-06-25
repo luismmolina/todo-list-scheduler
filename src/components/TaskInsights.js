@@ -20,6 +20,16 @@ const AlertDescription = styled.p`
   color: ${(props) => props.theme.colors.text};
 `;
 
+const Button = styled.button`
+  background-color: ${(props) => props.theme.colors.primary};
+  color: ${(props) => props.theme.colors.text};
+  border: none;
+  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+  border-radius: 4px;
+`;
+
 const Alert = ({ children, title, description }) => (
   <AlertContainer>
     <AlertTitle>{title}</AlertTitle>
@@ -28,7 +38,11 @@ const Alert = ({ children, title, description }) => (
   </AlertContainer>
 );
 
-const TaskInsights = ({ reschedulingSuggestions, timeBlockSummary }) => {
+const TaskInsights = ({
+  reschedulingSuggestions,
+  timeBlockSummary,
+  onReschedule,
+}) => {
   return (
     <div>
       <h2>Task Insights</h2>
@@ -42,6 +56,9 @@ const TaskInsights = ({ reschedulingSuggestions, timeBlockSummary }) => {
             description={`${suggestion.reason} ${suggestion.suggestion}`}
           >
             <AlertCircle size={16} />
+            <Button onClick={() => onReschedule(suggestion.task.id)}>
+              Reschedule
+            </Button>
           </Alert>
         ))}
       </div>

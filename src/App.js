@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ThemeProvider } from "styled-components";
 import { parseTaskInput } from "./claudeIntegration";
 import { DynamicScheduler } from "./DynamicScheduler";
-import { theme } from "./theme";
+import { theme } from "./styles/theme";
 import GlobalStyle from "./globalStyles";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
@@ -139,7 +139,6 @@ const App = () => {
             "Failed to parse task:",
             parsedTask?.error || "Unknown error"
           );
-          // You might want to show an error message to the user here
         }
       } else {
         console.error("Scheduler is not initialized");
@@ -308,6 +307,31 @@ const App = () => {
     return summary;
   };
 
+  const handleReschedule = useCallback(
+    (taskId) => {
+      if (scheduler) {
+        const task = scheduler.tasks.find((t) => t.id === taskId);
+        if (task) {
+          const updatedTask = {
+            ...task,
+            status: "pending",
+            startTime: null,
+            endTime: null,
+          };
+          const updatedTasks = scheduler.tasks.map((t) =>
+            t.id === taskId ? updatedTask : t
+          );
+          const updatedSchedule = new DynamicScheduler(
+            updatedTasks,
+            currentTime
+          ).optimizeSchedule();
+          setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        }
+      }
+    },
+    [scheduler, currentTime]
+  );
+
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
@@ -342,6 +366,7 @@ const App = () => {
           <TaskInsights
             reschedulingSuggestions={reschedulingSuggestions}
             timeBlockSummary={timeBlockSummary}
+            onReschedule={handleReschedule}
           />
         </Main>
         <BottomNavigation

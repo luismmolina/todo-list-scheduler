@@ -19,30 +19,37 @@ const Content = ({
   editTask,
   currentTime,
   openMoveTaskModal,
-}) => (
-  <ContentContainer>
-    {viewMode === "list" ? (
-      <TaskList
-        tasks={tasks}
-        deleteTask={deleteTask}
-        completeTask={completeTask}
-        editTask={editTask}
-        currentTime={currentTime}
-        openMoveTaskModal={openMoveTaskModal}
-      />
-    ) : (
-      <DayView
-        tasks={tasks}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-        deleteTask={deleteTask}
-        completeTask={completeTask}
-        editTask={editTask}
-        currentTime={currentTime}
-        openMoveTaskModal={openMoveTaskModal}
-      />
-    )}
-  </ContentContainer>
-);
+}) => {
+  const activeTasks = tasks.filter(
+    (task) => task.status === "pending" || task.status === "ongoing"
+  );
+
+  return (
+    <ContentContainer>
+      <h2>Active Tasks</h2>
+      {viewMode === "list" ? (
+        <TaskList
+          tasks={activeTasks}
+          deleteTask={deleteTask}
+          completeTask={completeTask}
+          editTask={editTask}
+          currentTime={currentTime}
+          openMoveTaskModal={openMoveTaskModal}
+        />
+      ) : (
+        <DayView
+          tasks={activeTasks}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          deleteTask={deleteTask}
+          completeTask={completeTask}
+          editTask={editTask}
+          currentTime={currentTime}
+          openMoveTaskModal={openMoveTaskModal}
+        />
+      )}
+    </ContentContainer>
+  );
+};
 
 export default Content;
