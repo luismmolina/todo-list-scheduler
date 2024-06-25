@@ -1,12 +1,17 @@
-export async function parseTaskInput(userInput) {
+export async function parseTaskInput(taskInput) {
   try {
-    console.log("Sending request to parse task:", userInput);
+    console.log("Preparing to send request to parse task:", taskInput);
+
+    // Convert the task object to a string description
+    const taskDescription = `Title: ${taskInput.title}, Duration: ${taskInput.duration} minutes, Priority: ${taskInput.priority}, Location: ${taskInput.place}`;
+
+    console.log("Sending request to parse task:", taskDescription);
     const response = await fetch("/api/parse-task", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ userInput }),
+      body: JSON.stringify({ userInput: taskDescription }),
     });
 
     console.log("Received response:", response.status, response.statusText);

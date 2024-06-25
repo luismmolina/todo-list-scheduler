@@ -56,14 +56,14 @@ module.exports = async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `Parse the following task input and extract these details:
+            content: `Parse the following task description and extract these details:
           - Task title
           - Estimated duration (in minutes)
           - Priority (must do, should do, if time available)
           - Location (home, work, or unspecified)
           - Deadline (if mentioned)
 
-          User input: "${userInput}"
+          Task description: "${userInput}"
 
           Respond in JSON format.`,
           },

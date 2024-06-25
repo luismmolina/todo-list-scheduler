@@ -122,10 +122,11 @@ const App = () => {
         console.log("Scheduler exists, parsing task input");
         const parsedTask = await parseTaskInput(taskInput);
         console.log("Parsed task result:", parsedTask);
-        if (parsedTask) {
+        if (parsedTask && !parsedTask.error) {
           const newTask = {
             id: Date.now(),
-            ...parsedTask,
+            ...taskInput, // Use the original input
+            ...parsedTask, // Overwrite with any parsed values
             status: "pending",
           };
           console.log("New task created:", newTask);
@@ -134,7 +135,10 @@ const App = () => {
           setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
           console.log("Scheduler updated");
         } else {
-          console.error("Failed to parse task");
+          console.error(
+            "Failed to parse task:",
+            parsedTask?.error || "Unknown error"
+          );
         }
       } else {
         console.error("Scheduler is not initialized");
