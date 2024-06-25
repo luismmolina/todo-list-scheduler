@@ -1,5 +1,3 @@
-// api/parse-task.js
-
 const fetch = require("node-fetch");
 
 module.exports = async (req, res) => {
@@ -26,7 +24,7 @@ module.exports = async (req, res) => {
   }
 
   const { userInput } = req.body;
-  const API_KEY = process.env.ANTHROPIC_API_KEY;
+  const API_KEY = process.env.REACT_APP_ANTHROPIC_API_KEY;
   const API_URL = "https://api.anthropic.com/v1/messages";
 
   if (!API_KEY) {
