@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ThemeProvider } from "styled-components";
-import { parseTaskInput } from "./claudeIntegration";
-import { DynamicScheduler } from "./DynamicScheduler";
+import { parseTaskInput } from "./utils/claudeIntegration";
+import { DynamicScheduler } from "./utils/DynamicScheduler";
 import { theme } from "./styles/theme";
-import GlobalStyle from "./globalStyles";
+import GlobalStyle from "./styles/globalStyles";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import Content from "./components/Content";
@@ -14,6 +14,7 @@ import BottomNavigation from "./components/BottomNavigation";
 import TaskInsights from "./components/TaskInsights";
 import styled from "styled-components";
 import { differenceInMinutes, addDays, startOfDay } from "date-fns";
+import { getProductivityInsights } from "./utils/productivityInsights";
 
 const AppContainer = styled.div`
   display: flex;
@@ -64,6 +65,7 @@ const App = () => {
   const [taskToMove, setTaskToMove] = useState(null);
   const [reschedulingSuggestions, setReschedulingSuggestions] = useState([]);
   const [timeBlockSummary, setTimeBlockSummary] = useState([]);
+  const [productivityInsights, setProductivityInsights] = useState(null);
 
   useEffect(() => {
     const savedTasksString = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -94,8 +96,8 @@ const App = () => {
       setCurrentTime((prevTime) => {
         const newTime = new Date(prevTime.getTime() + 60000);
         if (scheduler) {
-          const updatedSchedule = scheduler.updateCurrentTime(newTime);
-          setScheduler(new DynamicScheduler(updatedSchedule, newTime));
+          scheduler.updateCurrentTime(newTime);
+          setScheduler(new DynamicScheduler(scheduler.tasks, newTime));
         }
         return newTime;
       });
@@ -112,39 +114,32 @@ const App = () => {
       setReschedulingSuggestions(suggestions);
       const summary = generateTimeBlockSummary(scheduler.tasks, currentTime);
       setTimeBlockSummary(summary);
+      const insights = getProductivityInsights(scheduler.tasks);
+      setProductivityInsights(insights);
     }
   }, [scheduler, currentTime]);
 
   const addTask = useCallback(
     async (taskInput) => {
-      console.log("Adding task, input:", taskInput);
       if (scheduler) {
-        console.log("Scheduler exists, parsing task input");
         const parsedTask = await parseTaskInput(taskInput);
-        console.log("Parsed task result:", parsedTask);
         if (parsedTask && !parsedTask.error) {
           const newTask = {
             id: Date.now(),
-            ...taskInput, // Use the original input
-            ...parsedTask, // Overwrite with any parsed values
+            ...taskInput,
+            ...parsedTask,
             status: "pending",
           };
-          console.log("New task created:", newTask);
-          const updatedSchedule = scheduler.addTask(newTask);
-          console.log("Updated schedule:", updatedSchedule);
+          const updatedSchedule = await scheduler.addTask(newTask);
           setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
-          console.log("Scheduler updated");
         } else {
           console.error(
             "Failed to parse task:",
             parsedTask?.error || "Unknown error"
           );
         }
-      } else {
-        console.error("Scheduler is not initialized");
       }
       setIsAddingTask(false);
-      console.log("Add task process completed");
     },
     [scheduler, currentTime]
   );
@@ -155,11 +150,13 @@ const App = () => {
         const updatedTasks = scheduler.tasks.filter(
           (task) => task.id !== taskId
         );
-        const updatedSchedule = new DynamicScheduler(
+        const updatedScheduler = new DynamicScheduler(
           updatedTasks,
           currentTime
-        ).optimizeSchedule();
-        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        );
+        updatedScheduler.optimizeSchedule().then(() => {
+          setScheduler(updatedScheduler);
+        });
       }
     },
     [scheduler, currentTime]
@@ -168,8 +165,9 @@ const App = () => {
   const completeTask = useCallback(
     (taskId) => {
       if (scheduler) {
-        const updatedSchedule = scheduler.completeTask(taskId);
-        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        scheduler.completeTask(taskId).then((updatedSchedule) => {
+          setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        });
       }
     },
     [scheduler, currentTime]
@@ -181,11 +179,13 @@ const App = () => {
         const updatedTasks = scheduler.tasks.map((task) =>
           task.id === taskId ? { ...task, ...updatedTask } : task
         );
-        const updatedSchedule = new DynamicScheduler(
+        const updatedScheduler = new DynamicScheduler(
           updatedTasks,
           currentTime
-        ).optimizeSchedule();
-        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        );
+        updatedScheduler.optimizeSchedule().then(() => {
+          setScheduler(updatedScheduler);
+        });
       }
     },
     [scheduler, currentTime]
@@ -198,11 +198,10 @@ const App = () => {
           ? { ...task, startTime: newDate, status: "pending" }
           : task
       );
-      const updatedSchedule = new DynamicScheduler(
-        updatedTasks,
-        currentTime
-      ).optimizeSchedule();
-      setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+      const updatedScheduler = new DynamicScheduler(updatedTasks, currentTime);
+      updatedScheduler.optimizeSchedule().then(() => {
+        setScheduler(updatedScheduler);
+      });
     }
     setIsMovingTask(false);
     setTaskToMove(null);
@@ -222,11 +221,13 @@ const App = () => {
         const updatedTasks = scheduler.tasks.map((t) =>
           t.id === taskId ? updatedTask : t
         );
-        const updatedSchedule = new DynamicScheduler(
+        const updatedScheduler = new DynamicScheduler(
           updatedTasks,
           currentTime
-        ).optimizeSchedule();
-        setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        );
+        updatedScheduler.optimizeSchedule().then(() => {
+          setScheduler(updatedScheduler);
+        });
       }
     }
   };
@@ -237,11 +238,10 @@ const App = () => {
         const adjustment = adjustments.find((adj) => adj.id === task.id);
         return adjustment ? { ...task, ...adjustment } : task;
       });
-      const updatedSchedule = new DynamicScheduler(
-        updatedTasks,
-        currentTime
-      ).optimizeSchedule();
-      setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+      const updatedScheduler = new DynamicScheduler(updatedTasks, currentTime);
+      updatedScheduler.optimizeSchedule().then(() => {
+        setScheduler(updatedScheduler);
+      });
     }
   };
 
@@ -308,8 +308,6 @@ const App = () => {
       summary.push(currentBlock);
     }
 
-    console.log("Time block summary:", summary); // Add this line for debugging
-
     return summary;
   };
 
@@ -327,9 +325,12 @@ const App = () => {
           const updatedTasks = scheduler.tasks.map((t) =>
             t.id === taskId ? updatedTask : t
           );
-          const newScheduler = new DynamicScheduler(updatedTasks, currentTime);
-          newScheduler.optimizeSchedule().then((updatedSchedule) => {
-            setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+          const updatedScheduler = new DynamicScheduler(
+            updatedTasks,
+            currentTime
+          );
+          updatedScheduler.optimizeSchedule().then(() => {
+            setScheduler(updatedScheduler);
           });
         }
       }
@@ -369,9 +370,11 @@ const App = () => {
             openMoveTaskModal={openMoveTaskModal}
           />
           <TaskInsights
+            tasks={scheduler ? scheduler.tasks : []}
             reschedulingSuggestions={reschedulingSuggestions}
             timeBlockSummary={timeBlockSummary}
             onReschedule={handleReschedule}
+            productivityInsights={productivityInsights}
           />
         </Main>
         <BottomNavigation

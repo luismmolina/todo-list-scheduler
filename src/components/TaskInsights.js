@@ -8,6 +8,8 @@ const InsightsContainer = styled.div`
   padding: 1rem;
   border-radius: 8px;
   margin-bottom: 1rem;
+  max-width: 600px;
+  width: 100%;
 `;
 
 const InsightSection = styled.div`
@@ -65,13 +67,32 @@ const IconWrapper = styled.span`
   align-items: center;
 `;
 
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 10px;
+  background-color: ${(props) => props.theme.colors.background};
+  border-radius: 5px;
+  margin-top: 0.5rem;
+`;
+
+const Progress = styled.div`
+  width: ${(props) => props.progress}%;
+  height: 100%;
+  background-color: ${(props) => props.theme.colors.primary};
+  border-radius: 5px;
+`;
+
 const TaskInsights = ({
-  tasks,
-  reschedulingSuggestions,
-  timeBlockSummary,
+  tasks = [],
+  reschedulingSuggestions = [],
+  timeBlockSummary = [],
   onReschedule,
   productivityInsights,
 }) => {
+  if (tasks.length === 0) {
+    return <InsightsContainer>No tasks available</InsightsContainer>;
+  }
+
   return (
     <InsightsContainer>
       <InsightSection>
@@ -80,50 +101,63 @@ const TaskInsights = ({
           <AlertContainer key={index}>
             <AlertTitle>{task.title}</AlertTitle>
             <AlertDescription>
-              Long-term value: {task.longTermValue}/10
+              Long-term value: {task.longTermValue || "Not rated"}/10
             </AlertDescription>
-            <RatingContainer>
-              <IconWrapper>
-                <Star size={16} />
-              </IconWrapper>
-              <span>{task.rationale}</span>
-            </RatingContainer>
+            {task.rationale && (
+              <RatingContainer>
+                <IconWrapper>
+                  <Star size={16} />
+                </IconWrapper>
+                <span>{task.rationale}</span>
+              </RatingContainer>
+            )}
           </AlertContainer>
         ))}
       </InsightSection>
 
       <InsightSection>
         <SectionTitle>Rescheduling Suggestions</SectionTitle>
-        {reschedulingSuggestions.map((suggestion, index) => (
-          <AlertContainer key={index}>
-            <AlertTitle>{suggestion.task.title}</AlertTitle>
-            <AlertDescription>
-              {suggestion.reason} {suggestion.suggestion}
-            </AlertDescription>
-            <IconWrapper>
-              <AlertCircle size={16} />
-            </IconWrapper>
-            <Button onClick={() => onReschedule(suggestion.task.id)}>
-              Reschedule
-            </Button>
-          </AlertContainer>
-        ))}
+        {reschedulingSuggestions.length > 0 ? (
+          reschedulingSuggestions.map((suggestion, index) => (
+            <AlertContainer key={index}>
+              <AlertTitle>{suggestion.task.title}</AlertTitle>
+              <AlertDescription>
+                {suggestion.reason} {suggestion.suggestion}
+              </AlertDescription>
+              <IconWrapper>
+                <AlertCircle size={16} />
+              </IconWrapper>
+              <Button onClick={() => onReschedule(suggestion.task.id)}>
+                Reschedule
+              </Button>
+            </AlertContainer>
+          ))
+        ) : (
+          <AlertDescription>
+            No rescheduling suggestions at this time.
+          </AlertDescription>
+        )}
       </InsightSection>
 
       <InsightSection>
         <SectionTitle>Time Block Summary</SectionTitle>
-        {timeBlockSummary.map((block, index) => (
-          <TimeBlock key={index}>
-            <IconWrapper>
-              <Clock size={16} />
-            </IconWrapper>
-            <span>{block.place}: </span>
-            <span>
-              {format(block.start, "h:mm a")} - {format(block.end, "h:mm a")}
-            </span>
-            <span> ({block.duration} minutes)</span>
-          </TimeBlock>
-        ))}
+        {timeBlockSummary.length > 0 ? (
+          timeBlockSummary.map((block, index) => (
+            <TimeBlock key={index}>
+              <IconWrapper>
+                <Clock size={16} />
+              </IconWrapper>
+              <span>{block.place}: </span>
+              <span>
+                {format(new Date(block.start), "h:mm a")} -{" "}
+                {format(new Date(block.end), "h:mm a")}
+              </span>
+              <span> ({block.duration} minutes)</span>
+            </TimeBlock>
+          ))
+        ) : (
+          <AlertDescription>No time blocks scheduled.</AlertDescription>
+        )}
       </InsightSection>
 
       {productivityInsights && (
@@ -147,6 +181,44 @@ const TaskInsights = ({
               </IconWrapper>
             </AlertContainer>
           ))}
+          <AlertContainer>
+            <AlertTitle>Progress</AlertTitle>
+            <AlertDescription>
+              Tasks completed today:{" "}
+              {productivityInsights.progressMetrics.tasksCompletedToday}
+            </AlertDescription>
+            <AlertDescription>
+              Tasks completed this week:{" "}
+              {productivityInsights.progressMetrics.tasksCompletedThisWeek}
+            </AlertDescription>
+            <AlertDescription>
+              Total tasks: {productivityInsights.progressMetrics.totalTasks}
+            </AlertDescription>
+            <AlertDescription>
+              Pending tasks: {productivityInsights.progressMetrics.pendingTasks}
+            </AlertDescription>
+            <AlertDescription>
+              Time estimation accuracy:{" "}
+              {productivityInsights.progressMetrics.timeEstimationAccuracy}%
+            </AlertDescription>
+            <ProgressBar>
+              <Progress
+                progress={
+                  (productivityInsights.progressMetrics.tasksCompletedToday /
+                    productivityInsights.progressMetrics.totalTasks) *
+                  100
+                }
+              />
+            </ProgressBar>
+          </AlertContainer>
+          {productivityInsights.areasForImprovement.length > 0 && (
+            <AlertContainer>
+              <AlertTitle>Areas for Improvement</AlertTitle>
+              {productivityInsights.areasForImprovement.map((area, index) => (
+                <AlertDescription key={index}>{area}</AlertDescription>
+              ))}
+            </AlertContainer>
+          )}
         </InsightSection>
       )}
     </InsightsContainer>

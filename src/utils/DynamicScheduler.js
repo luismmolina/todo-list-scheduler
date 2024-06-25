@@ -1,5 +1,5 @@
 import { differenceInMinutes, addMinutes } from "date-fns";
-import { getTaskRatings } from "./utils/taskRatingSystem";
+import { getTaskRatings } from "./taskRatingSystem";
 
 const TIME_BLOCKS = [
   { start: 8, end: 12, place: "home" },
