@@ -1,13 +1,30 @@
 import React from "react";
-import { format } from "date-fns";
 import styled from "styled-components";
-import { AlertCircle, Clock } from "lucide-react";
+import { format } from "date-fns";
+import { AlertCircle, Clock, Star, TrendingUp, Activity } from "lucide-react";
+
+const InsightsContainer = styled.div`
+  background-color: ${(props) => props.theme.colors.surface};
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+`;
+
+const InsightSection = styled.div`
+  margin-bottom: 1.5rem;
+`;
+
+const SectionTitle = styled.h3`
+  color: ${(props) => props.theme.colors.text};
+  margin-bottom: 1rem;
+`;
 
 const AlertContainer = styled.div`
-  background-color: ${(props) => props.theme.colors.surface};
+  background-color: ${(props) => props.theme.colors.background};
   border-left: 4px solid ${(props) => props.theme.colors.accent};
   padding: 1rem;
   margin-bottom: 1rem;
+  border-radius: 4px;
 `;
 
 const AlertTitle = styled.h4`
@@ -30,53 +47,109 @@ const Button = styled.button`
   border-radius: 4px;
 `;
 
-const Alert = ({ children, title, description }) => (
-  <AlertContainer>
-    <AlertTitle>{title}</AlertTitle>
-    <AlertDescription>{description}</AlertDescription>
-    {children}
-  </AlertContainer>
-);
+const RatingContainer = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 0.5rem;
+`;
+
+const TimeBlock = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+`;
+
+const IconWrapper = styled.span`
+  margin-right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+`;
 
 const TaskInsights = ({
+  tasks,
   reschedulingSuggestions,
   timeBlockSummary,
   onReschedule,
+  productivityInsights,
 }) => {
   return (
-    <div>
-      <h2>Task Insights</h2>
+    <InsightsContainer>
+      <InsightSection>
+        <SectionTitle>Task Ratings</SectionTitle>
+        {tasks.map((task, index) => (
+          <AlertContainer key={index}>
+            <AlertTitle>{task.title}</AlertTitle>
+            <AlertDescription>
+              Long-term value: {task.longTermValue}/10
+            </AlertDescription>
+            <RatingContainer>
+              <IconWrapper>
+                <Star size={16} />
+              </IconWrapper>
+              <span>{task.rationale}</span>
+            </RatingContainer>
+          </AlertContainer>
+        ))}
+      </InsightSection>
 
-      <div>
-        <h3>Rescheduling Suggestions</h3>
+      <InsightSection>
+        <SectionTitle>Rescheduling Suggestions</SectionTitle>
         {reschedulingSuggestions.map((suggestion, index) => (
-          <Alert
-            key={index}
-            title={suggestion.task.title}
-            description={`${suggestion.reason} ${suggestion.suggestion}`}
-          >
-            <AlertCircle size={16} />
+          <AlertContainer key={index}>
+            <AlertTitle>{suggestion.task.title}</AlertTitle>
+            <AlertDescription>
+              {suggestion.reason} {suggestion.suggestion}
+            </AlertDescription>
+            <IconWrapper>
+              <AlertCircle size={16} />
+            </IconWrapper>
             <Button onClick={() => onReschedule(suggestion.task.id)}>
               Reschedule
             </Button>
-          </Alert>
+          </AlertContainer>
         ))}
-      </div>
+      </InsightSection>
 
-      <div>
-        <h3>Time Block Summary</h3>
+      <InsightSection>
+        <SectionTitle>Time Block Summary</SectionTitle>
         {timeBlockSummary.map((block, index) => (
-          <div key={index}>
-            <Clock size={16} />
+          <TimeBlock key={index}>
+            <IconWrapper>
+              <Clock size={16} />
+            </IconWrapper>
             <span>{block.place}: </span>
             <span>
               {format(block.start, "h:mm a")} - {format(block.end, "h:mm a")}
             </span>
-            <span>({block.duration} minutes)</span>
-          </div>
+            <span> ({block.duration} minutes)</span>
+          </TimeBlock>
         ))}
-      </div>
-    </div>
+      </InsightSection>
+
+      {productivityInsights && (
+        <InsightSection>
+          <SectionTitle>Productivity Insights</SectionTitle>
+          {productivityInsights.patterns.map((pattern, index) => (
+            <AlertContainer key={index}>
+              <AlertTitle>Pattern {index + 1}</AlertTitle>
+              <AlertDescription>{pattern}</AlertDescription>
+              <IconWrapper>
+                <TrendingUp size={16} />
+              </IconWrapper>
+            </AlertContainer>
+          ))}
+          {productivityInsights.recommendations.map((recommendation, index) => (
+            <AlertContainer key={index}>
+              <AlertTitle>Recommendation {index + 1}</AlertTitle>
+              <AlertDescription>{recommendation}</AlertDescription>
+              <IconWrapper>
+                <Activity size={16} />
+              </IconWrapper>
+            </AlertContainer>
+          ))}
+        </InsightSection>
+      )}
+    </InsightsContainer>
   );
 };
 

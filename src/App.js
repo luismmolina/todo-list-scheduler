@@ -327,11 +327,10 @@ const App = () => {
           const updatedTasks = scheduler.tasks.map((t) =>
             t.id === taskId ? updatedTask : t
           );
-          const updatedSchedule = new DynamicScheduler(
-            updatedTasks,
-            currentTime
-          ).optimizeSchedule();
-          setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+          const newScheduler = new DynamicScheduler(updatedTasks, currentTime);
+          newScheduler.optimizeSchedule().then((updatedSchedule) => {
+            setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+          });
         }
       }
     },

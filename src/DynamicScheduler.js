@@ -1,4 +1,5 @@
 import { differenceInMinutes, addMinutes } from "date-fns";
+import { getTaskRatings } from "./utils/taskRatingSystem";
 
 const TIME_BLOCKS = [
   { start: 8, end: 12, place: "home" },
@@ -17,8 +18,11 @@ export class DynamicScheduler {
     this.schedule = [];
   }
 
-  optimizeSchedule() {
-    this.sortTasksByPriority();
+  async optimizeSchedule() {
+    // Get AI ratings for tasks
+    this.tasks = await getTaskRatings(this.tasks);
+
+    this.sortTasksByPriorityAndValue();
     this.schedule = [];
     let currentSlot = new Date(this.currentTime);
 
@@ -32,7 +36,7 @@ export class DynamicScheduler {
           startTime: slot,
           endTime: addMinutes(slot, task.duration),
         });
-        currentSlot = addMinutes(slot, task.duration + BUFFER_TIME);
+        currentSlot = addMinutes(slot, task.duration + this.BUFFER_TIME);
       } else {
         task.status = "deferred";
       }
@@ -61,7 +65,7 @@ export class DynamicScheduler {
     return this.optimizeSchedule();
   }
 
-  sortTasksByPriority() {
+  sortTasksByPriorityAndValue() {
     const priorityOrder = {
       "must do": 3,
       "should do": 2,
@@ -70,7 +74,10 @@ export class DynamicScheduler {
     this.tasks.sort((a, b) => {
       if (a.status === "completed" && b.status !== "completed") return 1;
       if (b.status === "completed" && a.status !== "completed") return -1;
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
+      const priorityDiff =
+        priorityOrder[b.priority] - priorityOrder[a.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.longTermValue - a.longTermValue;
     });
   }
 
