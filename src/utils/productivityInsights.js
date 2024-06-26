@@ -1,6 +1,12 @@
-// src/utils/productivityInsights.js
+// productivityInsights.js
 
-import { isToday, isThisWeek, differenceInMinutes } from "date-fns";
+import {
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  format,
+  parseISO,
+} from "date-fns";
 
 export const getProductivityInsights = (tasks) => {
   if (!tasks || tasks.length === 0) {
@@ -10,95 +16,177 @@ export const getProductivityInsights = (tasks) => {
       mostProductiveTimeOfDay: null,
       taskCompletionRate: 0,
       averageTaskDuration: 0,
+      weeklyProductivity: [],
     };
   }
-  const completedTasks = tasks.filter((task) => task.status === "completed");
-  const pendingTasks = tasks.filter((task) => task.status === "pending");
-  const todaysTasks = tasks.filter(
-    (task) => task.startTime && isToday(new Date(task.startTime))
-  );
-  const thisWeeksTasks = tasks.filter(
-    (task) => task.startTime && isThisWeek(new Date(task.startTime))
+
+  // Helper function to safely parse dates
+  const safeParseISO = (dateString) => {
+    try {
+      return parseISO(dateString);
+    } catch (error) {
+      console.error("Error parsing date:", dateString);
+      return null;
+    }
+  };
+
+  // Group tasks by day
+  const tasksByDay = tasks.reduce((acc, task) => {
+    const startTime = safeParseISO(task.startTime);
+    if (!startTime) return acc;
+
+    const day = format(startTime, "EEEE"); // Full day name
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(task);
+    return acc;
+  }, {});
+
+  // Calculate productivity for each day
+  const productivityByDay = Object.entries(tasksByDay).map(
+    ([day, dayTasks]) => ({
+      day,
+      productivity: dayTasks.reduce(
+        (sum, task) => sum + (task.duration || 0),
+        0
+      ),
+    })
   );
 
-  const tasksCompletedToday = completedTasks.filter((task) =>
-    isToday(new Date(task.endTime))
-  ).length;
-  const tasksCompletedThisWeek = completedTasks.filter((task) =>
-    isThisWeek(new Date(task.endTime))
-  ).length;
+  // Find most and least productive days
+  let mostProductiveDay = null;
+  let leastProductiveDay = null;
+  if (productivityByDay.length > 0) {
+    mostProductiveDay = productivityByDay.reduce((max, day) =>
+      day.productivity > max.productivity ? day : max
+    ).day;
+    leastProductiveDay = productivityByDay.reduce((min, day) =>
+      day.productivity < min.productivity ? day : min
+    ).day;
+  }
 
-  const totalEstimatedTime = completedTasks.reduce(
-    (sum, task) => sum + task.duration,
+  // Calculate most productive time of day
+  const tasksByHour = tasks.reduce((acc, task) => {
+    const startTime = safeParseISO(task.startTime);
+    if (!startTime) return acc;
+
+    const hour = startTime.getHours();
+    if (!acc[hour]) acc[hour] = 0;
+    acc[hour] += task.duration || 0;
+    return acc;
+  }, {});
+
+  const mostProductiveHour = Object.entries(tasksByHour).reduce(
+    (max, [hour, duration]) =>
+      duration > max.duration ? { hour: Number(hour), duration } : max,
+    { hour: null, duration: 0 }
+  ).hour;
+
+  const mostProductiveTimeOfDay =
+    mostProductiveHour !== null
+      ? `${mostProductiveHour}:00 - ${(mostProductiveHour + 1) % 24}:00`
+      : null;
+
+  // Calculate task completion rate
+  const completedTasks = tasks.filter(
+    (task) => task.status === "completed"
+  ).length;
+  const taskCompletionRate =
+    tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
+
+  // Calculate average task duration
+  const totalDuration = tasks.reduce(
+    (sum, task) => sum + (task.duration || 0),
     0
   );
-  const totalActualTime = completedTasks.reduce(
-    (sum, task) =>
-      sum +
-      differenceInMinutes(new Date(task.endTime), new Date(task.startTime)),
-    0
-  );
+  const averageTaskDuration =
+    tasks.length > 0 ? totalDuration / tasks.length : 0;
 
-  const timeEstimationAccuracy =
-    totalEstimatedTime > 0
-      ? Math.round((totalActualTime / totalEstimatedTime) * 100)
-      : 100;
+  // Calculate weekly productivity
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const weekEnd = endOfWeek(now);
+  const daysOfWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const mostProductivePlace = getMostProductivePlace(completedTasks);
-  const mostFrequentPriority = getMostFrequentPriority(tasks);
-
-  const patterns = [
-    `You've completed ${tasksCompletedToday} tasks today and ${tasksCompletedThisWeek} this week.`,
-    `Your time estimation accuracy is ${timeEstimationAccuracy}%.`,
-    `You seem to be most productive when working ${mostProductivePlace}.`,
-    `Most of your tasks are marked as "${mostFrequentPriority}" priority.`,
-  ];
-
-  const recommendations = [
-    timeEstimationAccuracy < 90
-      ? "Try to improve your time estimation accuracy by breaking tasks into smaller, more manageable chunks."
-      : "Great job on accurately estimating task durations!",
-    `Consider scheduling more tasks to be done ${mostProductivePlace} when possible.`,
-    pendingTasks.length > 5
-      ? "You have several pending tasks. Consider prioritizing or delegating some of them."
-      : "You're managing your task load well!",
-    todaysTasks.length === 0
-      ? "You don't have any tasks scheduled for today. Consider planning your day in advance."
-      : "Good job on planning tasks for today!",
-  ];
+  const weeklyProductivity = daysOfWeek.map((day) => {
+    const dayName = format(day, "EEEE");
+    const dayTasks = tasksByDay[dayName] || [];
+    const productivity = dayTasks.reduce(
+      (sum, task) => sum + (task.duration || 0),
+      0
+    );
+    return {
+      day: dayName,
+      productivity: productivity,
+    };
+  });
 
   return {
-    patterns,
-    recommendations,
-    progressMetrics: {
-      tasksCompletedToday,
-      tasksCompletedThisWeek,
-      totalTasks: tasks.length,
-      pendingTasks: pendingTasks.length,
-      timeEstimationAccuracy,
-    },
-    areasForImprovement: [
-      timeEstimationAccuracy < 90 ? "Time estimation accuracy" : null,
-      pendingTasks.length > 5 ? "Task prioritization" : null,
-      todaysTasks.length === 0 ? "Daily planning" : null,
-    ].filter(Boolean),
+    mostProductiveDay,
+    leastProductiveDay,
+    mostProductiveTimeOfDay,
+    taskCompletionRate,
+    averageTaskDuration,
+    weeklyProductivity,
   };
 };
 
-function getMostProductivePlace(completedTasks) {
-  const placeCounts = completedTasks.reduce((counts, task) => {
-    counts[task.place] = (counts[task.place] || 0) + 1;
-    return counts;
-  }, {});
+// Additional helper functions can be added here if needed
 
-  return Object.entries(placeCounts).sort((a, b) => b[1] - a[1])[0][0];
-}
+export const getProductivityTrend = (weeklyProductivity) => {
+  if (!weeklyProductivity || weeklyProductivity.length < 2) {
+    return "Not enough data";
+  }
 
-function getMostFrequentPriority(tasks) {
-  const priorityCounts = tasks.reduce((counts, task) => {
-    counts[task.priority] = (counts[task.priority] || 0) + 1;
-    return counts;
-  }, {});
+  const firstHalf = weeklyProductivity.slice(
+    0,
+    Math.floor(weeklyProductivity.length / 2)
+  );
+  const secondHalf = weeklyProductivity.slice(
+    Math.floor(weeklyProductivity.length / 2)
+  );
 
-  return Object.entries(priorityCounts).sort((a, b) => b[1] - a[1])[0][0];
-}
+  const firstHalfAvg =
+    firstHalf.reduce((sum, day) => sum + day.productivity, 0) /
+    firstHalf.length;
+  const secondHalfAvg =
+    secondHalf.reduce((sum, day) => sum + day.productivity, 0) /
+    secondHalf.length;
+
+  if (secondHalfAvg > firstHalfAvg * 1.1) {
+    return "Increasing";
+  } else if (secondHalfAvg < firstHalfAvg * 0.9) {
+    return "Decreasing";
+  } else {
+    return "Stable";
+  }
+};
+
+export const getSuggestedImprovements = (insights) => {
+  const suggestions = [];
+
+  if (insights.taskCompletionRate < 70) {
+    suggestions.push(
+      "Try to improve your task completion rate by setting more realistic goals or breaking tasks into smaller, manageable chunks."
+    );
+  }
+
+  if (insights.leastProductiveDay) {
+    suggestions.push(
+      `Your least productive day is ${insights.leastProductiveDay}. Consider adjusting your schedule or environment on this day to boost productivity.`
+    );
+  }
+
+  if (insights.mostProductiveTimeOfDay) {
+    suggestions.push(
+      `You're most productive during ${insights.mostProductiveTimeOfDay}. Try scheduling your most important tasks during this time.`
+    );
+  }
+
+  if (insights.averageTaskDuration > 120) {
+    suggestions.push(
+      "Your average task duration is quite long. Consider breaking larger tasks into smaller, more manageable subtasks."
+    );
+  }
+
+  return suggestions;
+};
