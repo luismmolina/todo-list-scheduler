@@ -1,4 +1,4 @@
-import { differenceInMinutes, addMinutes } from "date-fns";
+import { differenceInMinutes, addMinutes, isWithinInterval } from "date-fns";
 import { getTaskRatings } from "./taskRatingSystem";
 
 const TIME_BLOCKS = [
@@ -14,7 +14,7 @@ const BUFFER_TIME = 10; // 10 minutes buffer between tasks
 export class DynamicScheduler {
   constructor(tasks, currentTime) {
     this.tasks = tasks;
-    this.currentTime = currentTime;
+    this.currentTime = new Date(currentTime);
     this.schedule = [];
   }
 
@@ -31,26 +31,34 @@ export class DynamicScheduler {
 
       const slot = this.findNextSlot(currentSlot, task.duration, task.place);
       if (slot) {
+        const startTime = new Date(slot);
+        const endTime = addMinutes(slot, task.duration);
         this.schedule.push({
           ...task,
-          startTime: slot,
-          endTime: addMinutes(slot, task.duration),
+          startTime,
+          endTime,
+          status: "pending",
         });
-        currentSlot = addMinutes(slot, task.duration + this.BUFFER_TIME);
+        currentSlot = addMinutes(slot, task.duration + BUFFER_TIME);
       } else {
         task.status = "deferred";
+        task.startTime = null;
+        task.endTime = null;
       }
     }
 
-    return this.schedule;
+    this.tasks = this.schedule.concat(
+      this.tasks.filter((t) => t.status === "deferred")
+    );
+    return this.tasks;
   }
 
-  addTask(newTask) {
+  async addTask(newTask) {
     this.tasks.push(newTask);
     return this.optimizeSchedule();
   }
 
-  completeTask(taskId) {
+  async completeTask(taskId) {
     const task = this.tasks.find((t) => t.id === taskId);
     if (task) {
       task.status = "completed";
@@ -60,8 +68,8 @@ export class DynamicScheduler {
     return this.optimizeSchedule();
   }
 
-  updateCurrentTime(newTime) {
-    this.currentTime = newTime;
+  async updateCurrentTime(newTime) {
+    this.currentTime = new Date(newTime);
     return this.optimizeSchedule();
   }
 
@@ -176,5 +184,14 @@ export class DynamicScheduler {
           t.duration = Math.round((t.duration + newEstimate) / 2);
         });
     }
+  }
+
+  isWithinWorkingHours(startTime, endTime) {
+    const workStart = new Date(startTime).setHours(8, 0, 0, 0);
+    const workEnd = new Date(startTime).setHours(22, 0, 0, 0);
+    return (
+      isWithinInterval(startTime, { start: workStart, end: workEnd }) &&
+      isWithinInterval(endTime, { start: workStart, end: workEnd })
+    );
   }
 }
