@@ -6,6 +6,7 @@ import {
   eachDayOfInterval,
   format,
   parseISO,
+  isValid,
 } from "date-fns";
 
 export const getProductivityInsights = (tasks) => {
@@ -21,18 +22,27 @@ export const getProductivityInsights = (tasks) => {
   }
 
   // Helper function to safely parse dates
-  const safeParseISO = (dateString) => {
-    try {
-      return parseISO(dateString);
-    } catch (error) {
-      console.error("Error parsing date:", dateString);
-      return null;
+  const safeParseDate = (dateInput) => {
+    if (dateInput instanceof Date && isValid(dateInput)) {
+      return dateInput;
     }
+    if (typeof dateInput === "string") {
+      try {
+        const parsedDate = parseISO(dateInput);
+        if (isValid(parsedDate)) {
+          return parsedDate;
+        }
+      } catch (error) {
+        console.error("Error parsing date string:", dateInput);
+      }
+    }
+    console.error("Invalid date input:", dateInput);
+    return null;
   };
 
   // Group tasks by day
   const tasksByDay = tasks.reduce((acc, task) => {
-    const startTime = safeParseISO(task.startTime);
+    const startTime = safeParseDate(task.startTime);
     if (!startTime) return acc;
 
     const day = format(startTime, "EEEE"); // Full day name
@@ -66,7 +76,7 @@ export const getProductivityInsights = (tasks) => {
 
   // Calculate most productive time of day
   const tasksByHour = tasks.reduce((acc, task) => {
-    const startTime = safeParseISO(task.startTime);
+    const startTime = safeParseDate(task.startTime);
     if (!startTime) return acc;
 
     const hour = startTime.getHours();
@@ -129,8 +139,6 @@ export const getProductivityInsights = (tasks) => {
     weeklyProductivity,
   };
 };
-
-// Additional helper functions can be added here if needed
 
 export const getProductivityTrend = (weeklyProductivity) => {
   if (!weeklyProductivity || weeklyProductivity.length < 2) {
