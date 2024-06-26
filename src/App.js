@@ -134,8 +134,16 @@ const App = () => {
             ...parsedTask,
             status: "pending",
           };
-          const updatedSchedule = await scheduler.addTask(newTask);
-          setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+          const updatedTasks = [...scheduler.tasks, newTask];
+          const updatedScheduler = new DynamicScheduler(
+            updatedTasks,
+            currentTime
+          );
+          await updatedScheduler.optimizeSchedule();
+          setScheduler(updatedScheduler);
+
+          // Save to localStorage
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedTasks));
         } else {
           console.error(
             "Failed to parse task:",
