@@ -2,7 +2,16 @@
 
 import { isToday, isThisWeek, differenceInMinutes } from "date-fns";
 
-export function getProductivityInsights(tasks) {
+export const getProductivityInsights = (tasks) => {
+  if (!tasks || tasks.length === 0) {
+    return {
+      mostProductiveDay: null,
+      leastProductiveDay: null,
+      mostProductiveTimeOfDay: null,
+      taskCompletionRate: 0,
+      averageTaskDuration: 0,
+    };
+  }
   const completedTasks = tasks.filter((task) => task.status === "completed");
   const pendingTasks = tasks.filter((task) => task.status === "pending");
   const todaysTasks = tasks.filter(
@@ -74,7 +83,7 @@ export function getProductivityInsights(tasks) {
       todaysTasks.length === 0 ? "Daily planning" : null,
     ].filter(Boolean),
   };
-}
+};
 
 function getMostProductivePlace(completedTasks) {
   const placeCounts = completedTasks.reduce((counts, task) => {

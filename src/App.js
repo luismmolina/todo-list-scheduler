@@ -106,7 +106,7 @@ const App = () => {
   }, [scheduler]);
 
   useEffect(() => {
-    if (scheduler) {
+    if (scheduler && scheduler.tasks.length > 0) {
       const suggestions = generateReschedulingSuggestions(
         scheduler.tasks,
         currentTime
@@ -116,6 +116,10 @@ const App = () => {
       setTimeBlockSummary(summary);
       const insights = getProductivityInsights(scheduler.tasks);
       setProductivityInsights(insights);
+    } else {
+      setReschedulingSuggestions([]);
+      setTimeBlockSummary([]);
+      setProductivityInsights(null);
     }
   }, [scheduler, currentTime]);
 
