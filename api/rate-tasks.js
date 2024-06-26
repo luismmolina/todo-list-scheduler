@@ -32,15 +32,21 @@ module.exports = async (req, res) => {
             role: "user",
             content: `Rate the following tasks based on their long-term benefit to the user. Provide a rating from 1-10 (10 being highest value) and a brief rationale for each rating.
 
-        Tasks:
-        ${tasks
-          .map(
-            (task) =>
-              `- ${task.title} (Duration: ${task.duration} minutes, Priority: ${task.priority})`
-          )
-          .join("\n")}
+Tasks:
+${tasks
+  .map(
+    (task, index) =>
+      `${index + 1}. ${task.title} (Duration: ${
+        task.duration
+      } minutes, Priority: ${task.priority})`
+  )
+  .join("\n")}
 
-        Respond in JSON format with an array of objects, each containing 'longTermValue' and 'rationale'.`,
+Respond ONLY with a valid JSON array of objects, each containing 'longTermValue' (a number) and 'rationale' (a string). Do not include any other text. Example:
+[
+  {"longTermValue": 8, "rationale": "This task contributes significantly to long-term goals."},
+  {"longTermValue": 5, "rationale": "This task has moderate long-term impact."}
+]`,
           },
         ],
       }),
@@ -54,9 +60,26 @@ module.exports = async (req, res) => {
 
     const data = await response.json();
     const content = data.content[0].text;
-    const ratings = JSON.parse(content);
 
-    res.status(200).json(ratings);
+    let ratings;
+    try {
+      ratings = JSON.parse(content);
+    } catch (parseError) {
+      console.error("Error parsing API response:", content);
+      throw new Error("Invalid response format from Anthropic API");
+    }
+
+    if (!Array.isArray(ratings) || ratings.length !== tasks.length) {
+      throw new Error("Unexpected response format from Anthropic API");
+    }
+
+    const ratedTasks = tasks.map((task, index) => ({
+      ...task,
+      longTermValue: ratings[index].longTermValue,
+      rationale: ratings[index].rationale,
+    }));
+
+    res.status(200).json(ratedTasks);
   } catch (error) {
     console.error("Error in rate-tasks function:", error);
     res.status(500).json({ error: error.message || "Error rating tasks" });
