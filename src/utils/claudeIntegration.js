@@ -2,6 +2,14 @@ export async function parseTaskInput(taskInput) {
   try {
     console.log("Preparing to send request to parse task:", taskInput);
 
+    // Get completed tasks from localStorage
+    const completedTasks = JSON.parse(
+      localStorage.getItem("completedTasks") || "[]"
+    );
+    const completedTitles = completedTasks.map((task) =>
+      task.title.toLowerCase()
+    );
+
     // Convert the task object to a string description
     const taskDescription = `Title: ${taskInput.title}, Duration: ${taskInput.duration} minutes, Priority: ${taskInput.priority}, Location: ${taskInput.place}`;
 
@@ -11,7 +19,10 @@ export async function parseTaskInput(taskInput) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ userInput: taskDescription }),
+      body: JSON.stringify({
+        userInput: taskDescription,
+        completedTasks: completedTitles,
+      }),
     });
 
     console.log("Received response:", response.status, response.statusText);

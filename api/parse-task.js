@@ -29,8 +29,9 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { userInput } = req.body;
+  const { userInput, completedTasks } = req.body;
   console.log("User input:", userInput);
+  console.log("Completed tasks:", completedTasks);
 
   const API_KEY = process.env.REACT_APP_ANTHROPIC_API_KEY;
   const API_URL = "https://api.anthropic.com/v1/messages";
@@ -56,16 +57,20 @@ module.exports = async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `Parse the following task description and extract these details:
-          - Task title
-          - Estimated duration (in minutes)
-          - Priority (must do, should do, if time available)
-          - Location (home, work, or unspecified)
-          - Deadline (if mentioned)
+            content: `Parse the following task description and extract these details, but IGNORE any tasks whose titles match (case-insensitive) any of these completed tasks: ${JSON.stringify(
+              completedTasks
+            )}
 
-          Task description: "${userInput}"
+            Extract:
+            - Task title
+            - Estimated duration (in minutes)
+            - Priority (must do, should do, if time available)
+            - Location (home, work, or unspecified)
+            - Deadline (if mentioned)
 
-          Respond in JSON format.`,
+            Task description: "${userInput}"
+
+            If the task title matches any completed task, return { "ignored": true }. Otherwise, respond in JSON format with the parsed details.`,
           },
         ],
       }),
@@ -91,7 +96,11 @@ module.exports = async (req, res) => {
     console.log("Parsed content:", content);
 
     const parsedTask = JSON.parse(content);
-    console.log("Parsed task:", parsedTask);
+
+    // If the task was ignored because it's completed, return null
+    if (parsedTask.ignored) {
+      return res.status(200).json(null);
+    }
 
     res.status(200).json(parsedTask);
   } catch (error) {
