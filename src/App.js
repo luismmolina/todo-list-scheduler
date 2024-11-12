@@ -15,6 +15,7 @@ import TaskInsights from "./components/TaskInsights";
 import styled from "styled-components";
 import { differenceInMinutes, addDays, startOfDay } from "date-fns";
 import { getProductivityInsights } from "./utils/productivityInsights";
+import { format } from "date-fns";
 
 const AppContainer = styled.div`
   display: flex;
@@ -177,8 +178,32 @@ const App = () => {
   const completeTask = useCallback(
     (taskId) => {
       if (scheduler) {
-        scheduler.completeTask(taskId).then((updatedSchedule) => {
-          setScheduler(new DynamicScheduler(updatedSchedule, currentTime));
+        const updatedTasks = scheduler.tasks.filter((task) => {
+          if (task.id === taskId) {
+            const completedTask = {
+              ...task,
+              status: "completed",
+              endTime: new Date(),
+            };
+            const completedTasks = JSON.parse(
+              localStorage.getItem("completedTasks") || "[]"
+            );
+            completedTasks.push(completedTask);
+            localStorage.setItem(
+              "completedTasks",
+              JSON.stringify(completedTasks)
+            );
+            return false;
+          }
+          return true;
+        });
+
+        const updatedScheduler = new DynamicScheduler(
+          updatedTasks,
+          currentTime
+        );
+        updatedScheduler.optimizeSchedule().then(() => {
+          setScheduler(updatedScheduler);
         });
       }
     },
